@@ -295,6 +295,309 @@ If "adjust": Return to scoping.
 node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milestone v[X.Y] requirements" --files .planning/REQUIREMENTS.md
 ```
 
+## 9.5. PM Lens — Milestone Priority Validation
+
+**Transition banner:**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PM LENS (MILESTONE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Mode shift: you've told me what you want to build this milestone.
+ Now let's look at it like a PM would.
+```
+
+Display context:
+```
+For a milestone, the PM lens is about focus: is this really the
+highest-leverage thing to build next, or are we building what's
+convenient? What are we deferring to LATER milestones, and why
+this sequence?
+
+We'll cover 4 areas (fewer than new-project because target users
+and overall hypothesis were already validated):
+
+1. Milestone Hypothesis — what does this milestone learn or prove?
+2. MVP Discipline — which milestone features survive the pressure test?
+3. Anti-Requirements — what are we explicitly deferring to next milestone?
+4. Success Metrics & Risks — how will we know THIS milestone worked?
+```
+
+**Scale-aware skip offer:**
+
+Check the milestone size. If the milestone has **fewer than 3 requirements** OR the total scope is a small refinement (e.g., bug fixes, polish, small UX improvements), offer to skip:
+
+```bash
+REQ_COUNT=$(grep -c "^- \[ \]" .planning/REQUIREMENTS.md 2>/dev/null || echo "0")
+```
+
+**If requirement count is small (< 3) OR scope appears to be refinement/polish:**
+
+Use AskUserQuestion:
+- header: "PM Lens?"
+- question: "This milestone is small ([N] requirement(s)). PM lens is typically more valuable for larger milestones. Run it anyway, or skip?"
+- options:
+  - "Skip — this is straightforward" — Move on to roadmap
+  - "Run it anyway" — Walk through the 4 areas
+  - "Quick version" — Just capture hypothesis and success metric, skip the rest
+
+**If the user chose "Skip":** Note in PROJECT.md under "Current Milestone" that PM lens was skipped (scope too small to warrant). Proceed to Step 10.
+
+**If "Quick version":** Only run Area 1 (Hypothesis) and Area 4 (Success Metric). Skip MVP Discipline and Anti-Requirements.
+
+**If "Run it anyway" OR milestone is not small:** Proceed with the full lens below.
+
+---
+
+**Full lens mode selection:**
+
+**If auto mode:** Attempt to extract PM answers from MILESTONE-CONTEXT.md if it exists, or use sensible defaults based on the milestone goals and existing PROJECT.md PM Validation section (if present). Log each decision inline. Skip the AskUserQuestion and proceed to writing.
+
+**Otherwise, use AskUserQuestion:**
+- header: "PM Lens"
+- question: "How much PM pressure-testing do you want to do on this milestone?"
+- options:
+  - "Walk me through it (Recommended)" — Interactive conversation through all 4 areas
+  - "I've thought about this" — Skip questions, I'll write short answers per area
+  - "Skip entirely" — Move on to roadmap (noted in PROJECT.md)
+
+**If "Skip entirely":** Note in PROJECT.md under "Current Milestone" that PM lens was skipped. Proceed to Step 10.
+
+**If "I've thought about this":** Ask the user to provide a short paragraph per area as plain text. Capture and proceed to "Capture to PROJECT.md" below.
+
+**If "Walk me through it" (default):**
+
+### Area 1: Milestone Hypothesis
+
+Ask inline (freeform, NOT AskUserQuestion):
+
+```
+Let's start with the milestone hypothesis. A milestone is essentially
+a bet: "If we ship this set of features, we'll learn/prove [X] and
+users will [Y]."
+
+Two questions:
+
+1. Why THIS milestone now? Of all the things we could build next,
+   why is this the highest-leverage? What does it unlock or
+   validate that other work can't?
+
+2. What does this milestone LEARN or PROVE? Not "it adds features" —
+   what specific thing will you know after shipping this milestone
+   that you don't know now?
+```
+
+Wait for response. **Probe for non-convenience reasoning:**
+
+- "We should build this because it's the next thing in the roadmap" is not a strong answer. "We should build this because users keep dropping off at [X] and this fixes it" is.
+- "It's a feature users asked for" is weak unless you can say how many and why they care.
+- "It makes the product more complete" is weak — completeness isn't a milestone outcome.
+
+**Red flags:**
+- "Everything depends on it" → "What specifically? Walk me through the dependency."
+- "It's the obvious next step" → "Obvious to whom? What other next steps did you consider?"
+- "Users have been asking" → "How many? What did they say? Is this what they actually need or what they said they want?"
+
+Capture the milestone hypothesis.
+
+### Area 2: MVP Discipline (Scope Pressure Test)
+
+Transition:
+
+```
+Now the uncomfortable part. You've defined [N] requirements for this
+milestone. I want to challenge each one against the milestone hypothesis.
+
+The question: does this requirement need to exist for the milestone
+hypothesis to be tested? If not, it gets deferred to the NEXT milestone.
+
+We'll walk through each requirement one at a time. This will feel like
+me pushing back on things you want — that's the point.
+
+Ready?
+```
+
+Wait for acknowledgment, then walk through **each requirement one at a time** (same thorough approach as new-project).
+
+For each requirement, ask:
+
+```
+REQ-[ID]: [requirement text]
+
+Question: If this requirement did NOT ship in this milestone, would
+the milestone hypothesis still be testable? Could the milestone still
+deliver its core learning/outcome?
+
+- Yes, testable without it → Defer to next milestone.
+- No, the hypothesis depends on it → It stays. Tell me why.
+```
+
+**Be willing to push back:**
+- "I hear you, but could we validate the milestone hypothesis without this feature?"
+- "What specifically would break if we deferred this to the next milestone?"
+- "If we shipped the milestone without this, would users still experience the core outcome?"
+
+**Track results:**
+- `v1_kept`: requirements that survived
+- `deferred_to_next`: requirements moved to next milestone
+- `deferral_reasons`: documentation
+
+**After walking through all requirements, summarize:**
+
+```
+## Milestone Scope — Pressure-Tested
+
+### This milestone (validated essential — [N] requirements)
+- REQ-XX: [text] — [why it's essential to this milestone]
+- ...
+
+### Deferred to next milestone — [M] requirements
+- REQ-YY: [text] — deferred because [reason]
+- ...
+```
+
+**Confirm via AskUserQuestion:**
+- header: "Scope"
+- question: "Does this refined milestone scope work?"
+- options:
+  - "Looks good, proceed"
+  - "Restore some items"
+  - "Re-do the pressure test"
+
+### Area 3: Anti-Requirements (Next Milestone Preview)
+
+Transition:
+
+```
+Let's explicitly capture what we're NOT building in this milestone.
+Unlike new-project, this is less about "what are we saying NO to
+forever" and more about "what are we sequencing LATER and why".
+
+1. What features are you tempted to include in this milestone but
+   forcing yourself to defer? Why defer them?
+
+2. What will the NEXT milestone likely focus on? (Just a rough
+   preview — we're not committing, but articulating this forces
+   clarity on what this milestone is NOT.)
+```
+
+Wait for response. Push for at least 2 deferred items — naming them forces the user to justify the current milestone's scope.
+
+**If the user can't name any deferred items:**
+```
+If you can't name anything you're deferring, either (a) this milestone
+is bigger than it should be — you're including everything, or (b) you
+don't have a vision for what comes next. Which is it?
+```
+
+Capture the deferred items and next milestone preview.
+
+### Area 4: Success Metrics & Key Risks
+
+Transition:
+
+```
+Last area. Two questions:
+
+1. Milestone Success Metric
+   How will you know THIS milestone worked? Not the overall product
+   metric from the original PM validation — the specific outcome you
+   expect from shipping this set of features.
+
+   Examples:
+   - "Onboarding completion rate goes from 40% to 60%"
+   - "Weekly active users grows by 25% within a month"
+   - "Support tickets about [specific pain point] drop by half"
+   - "Feature adoption rate > 30% within 2 weeks"
+
+   What's THIS MILESTONE's success metric?
+```
+
+Wait for response. Push for specificity and measurability.
+
+```
+2. Biggest Risk for this milestone
+   What could make this milestone fail to deliver its hypothesis?
+   Not "we'll run out of time" — what's the substantive risk that
+   the features won't deliver the outcome you expect?
+```
+
+Wait for response. Push for honesty — usually the risk is "users won't adopt the new feature" or "the feature solves the wrong problem."
+
+```
+3. How will you know early if the milestone is failing?
+   What's the signal in the first 2 weeks post-ship that would tell
+   you the milestone hypothesis isn't holding?
+```
+
+Capture metric, risk, and early signal.
+
+### Capture to PROJECT.md
+
+Update PROJECT.md's "Current Milestone" section with PM Validation:
+
+```markdown
+## Current Milestone: v[X.Y] [Name]
+
+**Goal:** [One sentence describing milestone focus]
+
+**Target features:**
+- [Feature 1]
+- [Feature 2]
+- [Feature 3]
+
+### PM Validation
+
+**Milestone Hypothesis:**
+If we ship this milestone, we'll [learn/prove X] and users will [behavior Y].
+
+**Why this milestone now:** [justification from Area 1]
+
+**Scope — Pressure-Tested:**
+- This milestone ([N] reqs): [list]
+- Deferred to next milestone ([M] reqs): [list with reasons]
+
+**Deferred for next milestone:**
+- [item 1] — [reason]
+- [item 2] — [reason]
+
+**Next milestone preview (non-committal):**
+[rough description of what comes after]
+
+**Success Metric:** [specific measurable metric]
+**Biggest Risk:** [honest articulation]
+**Early warning signal:** [what you'd see in 2 weeks if failing]
+```
+
+### If requirements changed
+
+If MVP Discipline moved items out of this milestone, update REQUIREMENTS.md:
+1. Move deferred items to a "Next Milestone" section (not "v2" — these are next-milestone specific)
+2. Add milestone success metric reference
+3. Recompute REQ-ID coverage for this milestone
+
+**Commit:**
+```bash
+node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: PM lens for milestone v[X.Y] — scope refined, metrics captured" --files .planning/PROJECT.md .planning/REQUIREMENTS.md
+```
+
+Display summary:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PM LENS COMPLETE ✓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+| Validation          | Result                          |
+|---------------------|---------------------------------|
+| Milestone hypothesis| [one-line summary]              |
+| Requirements        | [N] kept, [M] deferred to next  |
+| Success metric      | [metric]                        |
+| Biggest risk        | [one-line summary]              |
+
+PROJECT.md updated with Current Milestone PM Validation.
+REQUIREMENTS.md updated with refined milestone scope.
+```
+
 ## 10. Create Roadmap
 
 ```
@@ -410,6 +713,7 @@ Also: `/gsd:plan-phase [N]` — skip discussion, plan directly
 - [ ] Research completed (if selected) — 4 parallel agents, milestone-aware
 - [ ] Requirements gathered and scoped per category
 - [ ] REQUIREMENTS.md created with REQ-IDs
+- [ ] PM Lens applied (walked through, documented, skipped, or quick version) → PROJECT.md updated
 - [ ] gsd-roadmapper spawned with phase numbering context
 - [ ] Roadmap files written immediately (not draft)
 - [ ] User feedback incorporated (if any)

@@ -60,7 +60,33 @@ These are:
 - **Referenced** by planners, executors, and UI agents during every phase
 - **Maintained** after execution when new patterns emerge
 
-### 4. QA Engineer Depth in Verification
+### 4. PM Lens — Scope & Hypothesis Validation
+
+Before any roadmap gets created, Claude steps into product manager mode and pressure-tests the scope. This happens at two points:
+
+- **New project init** — right after requirements are defined, before artifacts and roadmap
+- **New milestone start** — right after milestone requirements, before the milestone roadmap
+
+The PM Lens walks through five areas (four for milestones):
+
+1. **Problem Clarity** — Who specifically is this for? What problem? Why haven't they solved it already?
+2. **Hypothesis Framing** — Treat the project as a bet: "If we build X, [users] will [action], because [why]." Prove/disprove evidence. Early signal in 2 weeks.
+3. **MVP Discipline** — Walk through every requirement one at a time. For each: "If this didn't exist in v1, would the hypothesis still be testable?" Features that don't pass get deferred. Thoroughly.
+4. **Anti-Requirements** — Explicitly capture what we're NOT building. Tempting-but-deferred features + explicit nos that might surprise users.
+5. **Success Metrics & Key Risks** — The one measurable metric that matters + the honest answer to "what could make this fail?"
+
+All validation outcomes land in PROJECT.md under a `## PM Validation` section. If MVP Discipline moved items from v1 to v2, REQUIREMENTS.md gets updated automatically before the roadmap is created.
+
+**Escape hatches:**
+- "Walk me through it" (default) — full interactive walkthrough
+- "I've thought about this" — user provides short paragraphs per area, no interrogation
+- "Skip entirely" — noted in PROJECT.md with date
+
+For tiny milestones (fewer than 3 requirements), Claude offers to skip or run a "quick version" that covers only hypothesis and success metric.
+
+**Why this matters:** Projects don't fail because the code is bad. They fail because someone built the wrong thing, or the right thing at the wrong time, or built too much before learning whether the hypothesis was even real. The PM Lens is the cheapest way to catch these failure modes before code exists.
+
+### 5. QA Engineer Depth in Verification
 
 The standard GSD verification workflow extracts tests from phase summaries and walks the user through them. GSD Nitty Gritty adds a **systematic edge case expansion** step that thinks like a QA engineer:
 
@@ -86,7 +112,8 @@ This is a drop-in enhancement to the standard GSD workflow. The same commands wo
 
 | Workflow Step | Standard GSD | Nitty Gritty |
 |--------------|-------------|--------------|
-| **Project Init** | PROJECT.md, REQUIREMENTS.md, ROADMAP.md | + SECURITY.md, APIS.md, TESTING-STRATEGY.md, ERROR-HANDLING.md, DESIGN-SYSTEM.md |
+| **Project Init** | PROJECT.md, REQUIREMENTS.md, ROADMAP.md | + SECURITY.md, APIS.md, TESTING-STRATEGY.md, ERROR-HANDLING.md, DESIGN-SYSTEM.md + **PM Lens** (5-area scope validation) |
+| **New Milestone** | Load context → requirements → roadmap | + **PM Lens** (4-area milestone validation with scale-aware skip) |
 | **UI Phase** | 6-dimension UI-SPEC validation | + Mandatory DESIGN-SYSTEM.md compliance, all interaction states required, full user flow coverage (happy/error/empty/loading), WCAG 2.1 AA accessibility baseline |
 | **Verify Work** | Tests extracted from phase summaries | + QA depth expansion: systematic edge case tests across input validation, state transitions, boundaries, failure modes, accessibility, cross-device, security, data integrity, performance |
 | **Requirements** | Specific, testable, user-centric | + First-principles decomposition of each feature into engineering concerns |
