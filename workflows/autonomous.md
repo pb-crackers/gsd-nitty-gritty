@@ -358,6 +358,7 @@ Read the 3-5 most relevant files to understand existing patterns.
 - **Reusable assets** — existing components, hooks, utilities usable in this phase
 - **Established patterns** — how the codebase does state management, styling, data fetching
 - **Integration points** — where new code connects (routes, nav, providers)
+- **Refactor opportunities (CRITICAL)** — existing code in the same domain that could be extended/refactored instead of writing net new code. For each: the file/module, what it does, how it could be extended, whether extending is better than creating new. The refactor-first principle applies in autonomous mode too — don't default to "write new" when existing code can serve.
 
 ---
 
@@ -391,9 +392,32 @@ Use these defaults for the CONTEXT.md:
 - `<specifics>`: "No specific requirements — infrastructure phase"
 - `<deferred>`: "None"
 
-**If NOT infrastructure — generate grey area proposals:**
+**If NOT infrastructure — classify phase engineering depth and generate grey area proposals:**
 
-Determine domain type from the phase goal:
+**Phase engineering depth classification (CRITICAL):**
+
+Determine whether this phase has engineering depth beyond pure visual/UX work:
+
+- **Pure visual/UX phase:** extending existing UI components, restyling, layout tweaks, copy changes, no new data/APIs/logic/state
+- **Engineering depth phase:** new API endpoints, new database tables or migrations, new backend logic, refactoring existing code, new integrations, auth/security work, state management changes, performance work
+- **Mixed phase:** both visual and engineering depth
+
+**If pure visual/UX:** Use the domain type approach below (visual, interface, execution, content, organization).
+
+**If engineering depth or mixed:** Walk through the engineering concerns checklist and generate grey areas with trade-off analysis. You are acting as a senior engineer — propose recommendations grounded in pros/cons, existing code, and project scale.
+
+**Engineering concerns checklist (apply only relevant ones):**
+
+1. **Refactor Opportunities (CHECK FIRST)** — From codebase_context refactor opportunities, propose whether to extend existing code or create new. Trade-off: consolidation vs separation of concerns.
+2. **Data Model** — new table vs extend existing? normalization level? soft vs hard deletes? migration strategy?
+3. **API Design** — new endpoint vs extend existing? request/response shape? breaking change? pagination?
+4. **Security** — trust boundary? auth model? input validation strategy? (Reference SECURITY.md for established patterns.)
+5. **Error Handling** — user-facing vs internal? retry strategy? graceful degradation? (Reference ERROR-HANDLING.md.)
+6. **Performance** — data volume expectations? N+1 risk? caching? sync vs async? (Reference APIS.md Data Access.)
+7. **Testing** — critical behaviors? test boundaries? (Reference TESTING-STRATEGY.md.)
+8. **State Management** — state location? synchronization strategy? optimistic updates?
+
+**Domain type approach (for pure visual/UX phases only):**
 - Something users **SEE** → visual: layout, interactions, states, density
 - Something users **CALL** → interface: contracts, responses, errors, auth
 - Something users **RUN** → execution: invocation, output, behavior modes, flags
@@ -403,8 +427,9 @@ Determine domain type from the phase goal:
 Check prior_decisions — skip grey areas already decided in prior phases.
 
 Generate **3-4 grey areas** with **~4 questions each**. For each question:
-- **Pre-select a recommended answer** based on: prior decisions (consistency), codebase patterns (reuse), domain conventions (standard approaches), ROADMAP success criteria
+- **Pre-select a recommended answer** based on: prior decisions (consistency), codebase patterns (reuse), domain conventions (standard approaches), ROADMAP success criteria, project standards (SECURITY.md/APIS.md/etc.)
 - Generate **1-2 alternatives** per question
+- **For engineering decisions: include pros/cons in the rationale column** — not just "recommended: X" but "recommended: X because [pro] outweighs [con]; alternative Y has [different pro] but [different con]"
 - **Annotate** with prior decision context ("You decided X in Phase N") and code context ("Component Y exists with Z variants") where relevant
 
 ---
@@ -501,6 +526,21 @@ Use **exactly** this structure (identical to discuss-phase output):
 {Any "You decide" answers collected — note Claude has flexibility here}
 
 </decisions>
+
+<engineering_decisions>
+## Engineering Decisions & Rationale
+
+**Only include this section if the phase had engineering depth.** For each engineering decision, capture not just the choice but the reasoning.
+
+### {Engineering concern}
+**Decision:** {Chosen option}
+**Alternatives considered:** {Other options}
+**Rationale:** {Why this option — pros that won, acceptable cons, project context}
+**Affects:** {Downstream code/phases impacted}
+
+[If no engineering decisions: omit this entire section]
+
+</engineering_decisions>
 
 <code_context>
 ## Existing Code Insights

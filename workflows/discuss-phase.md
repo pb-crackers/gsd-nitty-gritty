@@ -292,12 +292,21 @@ From the scan, identify:
 - **Established patterns** — how the codebase does state management, styling, data fetching
 - **Integration points** — where new code would connect (routes, nav, providers)
 - **Creative options** — approaches the existing architecture enables or constrains
+- **Refactor opportunities (CRITICAL)** — existing code in the same domain that could be extended/refactored to accomplish this phase's work instead of writing net new code. For each opportunity, note:
+  - The existing file/module/class
+  - What it currently does
+  - How it could be extended to serve this phase's needs
+  - Whether extending is better than creating new (will it make the existing code too complex? does it fit the existing abstraction?)
+
+**Think like a senior engineer doing a codebase tour:** You're not just cataloging files — you're identifying leverage points. If this phase adds user notifications and `EmailService` already exists, that's a refactor opportunity worth surfacing. If there are two utility files that both do validation, consolidating them is worth flagging. The goal is to prevent the AI from reflexively creating new files when existing ones could serve.
 
 Store as internal `<codebase_context>` for use in analyze_phase and present_gray_areas. This is NOT written to a file — it's used within this session only.
 </step>
 
 <step name="analyze_phase">
 Analyze the phase to identify gray areas worth discussing. **Use both `prior_decisions` and `codebase_context` to ground the analysis.**
+
+**You are acting as a senior engineer.** Your job is not just to pick options from a menu — it's to think through engineering consequences, identify leverage points in the existing codebase, surface trade-offs, and ask the questions that will shape the work. If the phase has real engineering depth (new backend, APIs, data, logic, refactoring), walk the user through the decisions that matter. If it's a pure visual tweak, don't invent engineering questions that don't exist.
 
 **Read the phase description from ROADMAP.md and determine:**
 
@@ -317,15 +326,114 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
    - Note applicable prior decisions for use in presentation
 
-3. **Gray areas by category** — For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this").
+3. **Phase engineering depth classification (CRITICAL)** — Determine the engineering depth of this phase. This decides whether you apply first-principles decomposition or stick to visual/UX decisions.
 
-4. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation, or all already decided in prior phases), the phase may not need discussion.
+   **Pure visual/UX phase (skip engineering decomposition):**
+   - Extending or restyling an existing UI component
+   - Adding visual variants, layout tweaks, copy changes
+   - No new data, APIs, logic, state, or integrations
+   - No database or backend changes
+
+   **Engineering depth phase (apply first-principles decomposition):**
+   - New API endpoints or changes to existing endpoints
+   - New database tables, schema changes, or migrations
+   - New backend logic, services, or business rules
+   - Refactoring existing code
+   - New integrations (third-party APIs, external services)
+   - Authentication, authorization, or security-sensitive work
+   - Data transformations, batch processing, or background jobs
+   - State management changes that affect multiple components or data sources
+   - Performance-sensitive work (caching, indexing, query optimization)
+
+   **Mixed phase:** Some phases have both visual and engineering depth (e.g., "build notification UI with backend delivery system"). Apply BOTH the visual gray area logic AND the engineering decomposition.
+
+4. **Gray area generation:**
+
+   **If pure visual/UX phase:** For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this"). Skip the engineering concerns checklist below.
+
+   **If engineering depth phase (or mixed):** Walk through the engineering concerns checklist below. For each concern relevant to this phase, identify decision points that have real trade-offs and deserve user input. You are thinking like an engineer would when estimating: "What decisions here would change the result or cost? What do I need the user's input on?"
+
+   **Engineering concerns checklist (apply only relevant ones — skip concerns that genuinely don't apply):**
+
+   1. **Refactor Opportunities (ALWAYS CHECK FIRST)** — From codebase_context, is there existing code that could be extended or refactored to accomplish this phase's work? If yes, surface it as a gray area:
+      - "We could extend `EmailService` to handle these notifications OR create a new `NotificationService`. Which approach?"
+      - "The existing `validateUser()` function handles most of what we need — extend it or write a new validator for this phase?"
+      - "Two similar utilities exist (`formatDate.ts` and `dateHelpers.ts`). Should we consolidate them as part of this phase or leave them?"
+      - **The refactor-first principle applies here too.** Don't let the user default to "write new code" without considering if existing code can serve.
+
+   2. **Data Model** — What data is being stored/changed? Gray areas might include:
+      - New table vs extend existing table vs JSONB field?
+      - Normalization level? (One table or split relationships?)
+      - Soft deletes vs hard deletes?
+      - Migration strategy if schema changes?
+
+   3. **API Design** — What's the interface?
+      - New endpoint vs extend existing?
+      - Request/response shape?
+      - Breaking change or backwards-compatible?
+      - Pagination/filtering needs?
+
+   4. **Security** — What's the trust boundary? Reference `.planning/SECURITY.md`.
+      - Who can access this? What's the authorization model?
+      - Input validation strategy?
+      - Any secrets or sensitive data involved?
+      - Does this deviate from established SECURITY.md patterns? (Flag if so.)
+
+   5. **Error Handling** — What can fail? Reference `.planning/ERROR-HANDLING.md`.
+      - User-facing vs internal failures?
+      - Retry strategy for transient issues?
+      - Graceful degradation or hard fail?
+
+   6. **Performance** — Reference `.planning/APIS.md` Data Access section.
+      - Expected data volume now and in 2 years?
+      - Any N+1 query risk?
+      - Caching strategy?
+      - Sync vs async processing?
+
+   7. **Testing** — Reference `.planning/TESTING-STRATEGY.md`.
+      - What's the critical behavior that MUST be tested?
+      - Unit vs integration vs E2E boundaries for this feature?
+      - Regression risk in existing code?
+
+   8. **State Management** — Where does state live? How is it synchronized?
+      - Client vs server authority?
+      - Optimistic updates or server-confirmed?
+
+5. **For each engineering gray area, prepare a trade-off analysis:**
+
+   When an engineering decision has multiple viable options, don't just list them — think through the consequences. For each option, identify:
+   - **Concrete pros** — specific advantages in this project's context
+   - **Concrete cons** — specific disadvantages, risks, or future costs
+   - **What it affects downstream** — other code, future phases, maintainability, performance
+   - **Your recommendation** — which option you'd pick and WHY, based on project state, existing code, and scale expectations
+
+   **Example trade-off analysis for a data model decision:**
+   ```
+   Decision: How to store user notifications?
+
+   Option A: New `notifications` table
+   - ✓ Pros: Clean schema, indexable, easy to query independently, supports future notification types
+   - ✗ Cons: Requires migration, adds a join when fetching user + notifications
+   - Affects: New API endpoint likely, notification fan-out logic, read/unread tracking
+
+   Option B: JSONB field on users table
+   - ✓ Pros: No migration, simpler initial implementation, colocated with user data
+   - ✗ Cons: Harder to query efficiently, can't index notification fields, JSONB grows unbounded per user
+   - Affects: User table size, query patterns, future migration pain if you switch later
+
+   Recommendation: Option A — you'll likely need to query notifications independently (unread counts, filtering by type), and the JSONB approach becomes painful as the feature grows. The migration cost is one-time; the query pain would be ongoing.
+   ```
+
+   The user makes the final call, but you've done the thinking so they can choose with full context.
+
+6. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation, or all already decided in prior phases), the phase may not need discussion.
 
 **Output your analysis internally, then present to user.**
 
-Example analysis for "Post Feed" phase (with code and prior context):
+Example analysis for "Post Feed" phase (pure visual, with code and prior context):
 ```
 Domain: Displaying posts from followed users
+Classification: Pure visual/UX phase — no new backend, APIs, or data
 Existing: Card component (src/components/ui/Card.tsx), useInfiniteQuery hook, Tailwind CSS
 Prior decisions: "Minimal UI preferred" (Phase 2), "No pagination — always infinite scroll" (Phase 4)
 Gray areas:
@@ -333,7 +441,19 @@ Gray areas:
 - UI: Information density (full posts vs previews) — no existing density patterns
 - Behavior: Loading pattern — ALREADY DECIDED: infinite scroll (Phase 4)
 - Empty State: What shows when no posts exist — EmptyState component exists in ui/
-- Content: What metadata displays (time, author, reactions count)
+```
+
+Example analysis for "User Notifications Backend" phase (engineering depth):
+```
+Domain: Backend system for user notifications with delivery and read tracking
+Classification: Engineering depth — new data, API, and logic
+Refactor opportunity: EmailService exists at src/services/email.ts — could extend it or create parallel NotificationService
+Gray areas:
+- Refactor: Extend EmailService or create new NotificationService? [trade-off analysis]
+- Data Model: notifications table vs JSONB on users? [trade-off analysis]
+- API Design: /notifications endpoint vs /users/:id/notifications? [trade-off analysis]
+- Performance: How to handle fan-out for users with many followers? [trade-off analysis]
+- Real-time: WebSocket push vs polling? [trade-off analysis]
 ```
 </step>
 
@@ -382,7 +502,51 @@ We'll clarify HOW to implement this.
   (You chose infinite scroll in Phase 4. useInfiniteQuery hook already set up.)
 ```
 
-**Do NOT include a "skip" or "you decide" option.** User ran this command to discuss — give them real choices.
+**For engineering depth gray areas: present trade-offs BEFORE the multiselect.**
+
+When the phase has engineering depth and you generated trade-off analyses in `analyze_phase`, display the trade-offs inline so the user sees the engineering thinking, not just option labels. Format:
+
+```
+## Engineering Decisions
+
+Before we pick which areas to dig into, here's the engineering thinking I've done:
+
+### 1. [Decision area name]
+
+**Context:** [what's being decided and why it matters]
+
+**Option A: [name]**
+- ✓ [concrete pro]
+- ✓ [concrete pro]
+- ✗ [concrete con]
+- **Affects:** [downstream impact]
+
+**Option B: [name]**
+- ✓ [concrete pro]
+- ✗ [concrete con]
+- ✗ [concrete con]
+- **Affects:** [downstream impact]
+
+**My recommendation:** [A or B] — [rationale grounded in this project's state, existing code, and scale expectations]
+
+---
+
+### 2. [Next decision area]
+
+[Same format]
+```
+
+Present ALL engineering trade-offs up front so the user sees the full picture. THEN use AskUserQuestion to let them pick which areas to discuss further OR accept your recommendations as-is.
+
+**AskUserQuestion for engineering phases:**
+- header: "Discuss"
+- question: "Which engineering decisions do you want to discuss, or accept the recommendations as-is?"
+- options: Include an "Accept all recommendations" option FIRST, then each decision area, then specific cross-cutting topics
+- multiSelect: true
+
+**Why the trade-off-first approach:** The user is not a multiple-choice test taker — they're a product owner who needs to understand the consequences. Showing them "Option A vs Option B" without context forces them to either trust you blindly or ask "what's the difference?". Showing them pros/cons/recommendations up front lets them validate your reasoning, push back if they disagree, or defer to you if the decision is too technical to care about.
+
+**Do NOT include a "skip" or "you decide" option in the overall gray area selection.** User ran this command to discuss — give them real choices. HOWEVER, "Accept all recommendations" is valid because it means "I trust your engineering reasoning, let's move on."
 
 **Examples by domain (with code context):**
 
@@ -442,6 +606,31 @@ After all areas are auto-resolved, skip the "Explore more gray areas" prompt and
    ```
    Let's talk about [Area].
    ```
+
+1b. **For engineering decisions: walk through consequences, not just options.**
+
+   If this area is an engineering decision (from the engineering concerns checklist in analyze_phase), start by re-stating the trade-off analysis and then ask the user to respond to your thinking, not just pick from a list. Format:
+
+   ```
+   Here's my thinking on [decision]:
+
+   [Brief restatement of the trade-off — pros, cons, recommendation]
+
+   My gut says [recommendation] because [rationale tied to existing code/project state/scale].
+
+   Does that reasoning hold for you, or are there constraints I'm missing?
+   ```
+
+   This is a conversation, not a quiz. Invite the user to push back on your reasoning, add context you don't have, or point out constraints that change the calculus. If they agree, capture the decision and move on. If they disagree, explore why — their disagreement often reveals context you didn't have access to.
+
+   **Probe for consequences when the user picks an option:**
+   - "If we go with Option A, we'll need to handle [downstream implication] — are you okay with that cost?"
+   - "That approach means we can't [future capability] without rework — is that a concern?"
+   - "This choice couples [X] to [Y] — is that acceptable?"
+
+   **Probe for refactor opportunities:**
+   - "Before we write new code for this, I noticed [existing file/class] does something similar. Want me to extend that instead?"
+   - "There are two existing utilities that overlap here — should we consolidate them as part of this work, or leave them alone?"
 
 2. **Ask questions using the selected pacing:**
 
@@ -557,6 +746,27 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 [Areas where user said "you decide" — note that Claude has flexibility here]
 
 </decisions>
+
+<engineering_decisions>
+## Engineering Decisions & Rationale
+
+**Only include this section if the phase had engineering depth.** For each engineering decision, capture not just the choice but the reasoning — future phases and downstream agents need to understand WHY a decision was made, not just what it was.
+
+### [Engineering concern — e.g., Data Model]
+**Decision:** [Chosen option]
+**Alternatives considered:** [Other options that were on the table]
+**Rationale:** [Why this option was chosen — pros that won, cons that were acceptable, project context that drove the choice]
+**Affects:** [What downstream code/phases this decision impacts]
+
+### [Next engineering concern — e.g., Refactor Approach]
+**Decision:** Extend existing `EmailService` rather than create new `NotificationService`
+**Alternatives considered:** New NotificationService with email as one delivery method
+**Rationale:** EmailService already handles template rendering and delivery retry logic. Extending keeps notification logic consolidated. If we add SMS/push later, we can refactor to a delivery-method abstraction then.
+**Affects:** src/services/email.ts will grow; notification types will live alongside email types; future SMS/push work will touch this file
+
+[If no engineering decisions: omit this entire section]
+
+</engineering_decisions>
 
 <canonical_refs>
 ## Canonical References
