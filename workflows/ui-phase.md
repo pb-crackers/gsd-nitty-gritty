@@ -69,6 +69,38 @@ Note: stack decisions (component library, styling approach) will be asked during
 ```
 Continue (non-blocking).
 
+**Check for DESIGN-SYSTEM.md (MANDATORY for UI phases):**
+
+```bash
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+```
+
+**If `DESIGN_SYSTEM_EXISTS` is false:**
+
+Display:
+```
+⚠ No DESIGN-SYSTEM.md found for this project.
+
+DESIGN-SYSTEM.md defines accessibility standards, required interaction
+states, responsive strategy, and UX requirements that the UI researcher
+and checker use to validate the design contract.
+
+Generating DESIGN-SYSTEM.md from defaults + project context...
+```
+
+Generate DESIGN-SYSTEM.md using the template defined in `new-project.md` Step 7.5, tailored to the project's stack (from PROJECT.md and any research context). Commit:
+
+```bash
+node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: generate DESIGN-SYSTEM.md for UI phase" --files .planning/DESIGN-SYSTEM.md
+```
+
+**If exists:** Continue silently.
+
+Set path for downstream agents:
+```bash
+DESIGN_SYSTEM_PATH=".planning/DESIGN-SYSTEM.md"
+```
+
 ## 4. Check Existing UI-SPEC
 
 ```bash
@@ -106,6 +138,12 @@ Read /Users/phillipdougherty/.claude/agents/gsd-ui-researcher.md for instruction
 <objective>
 Create UI design contract for Phase {phase_number}: {phase_name}
 Answer: "What visual and interaction contracts does this phase need?"
+
+**You are acting as a senior UX designer.** Think about the full user experience:
+not just the happy path visual, but accessibility, every interaction state,
+error handling in the UI, empty states, loading behavior, responsive behavior
+across devices, and reuse of existing components. A new Button variant is
+better than a new ButtonV2 component — refactor-first applies to UI too.
 </objective>
 
 <files_to_read>
@@ -114,7 +152,68 @@ Answer: "What visual and interaction contracts does this phase need?"
 - {requirements_path} (Requirements)
 - {context_path} (USER DECISIONS from /gsd:discuss-phase)
 - {research_path} (Technical Research — stack decisions)
+- {DESIGN_SYSTEM_PATH} (Project UX & accessibility standards — MANDATORY, the UI-SPEC must comply with this)
 </files_to_read>
+
+<ux_designer_requirements>
+The UI-SPEC.md you produce MUST address ALL of these dimensions per DESIGN-SYSTEM.md:
+
+1. **Accessibility (WCAG 2.1 AA)**
+   - Color contrast ratios (4.5:1 normal text, 3:1 large text) — specify actual contrast values
+   - Keyboard navigation — every interactive element reachable via Tab, operable via Enter/Space
+   - Focus management — visible focus indicators, logical tab order, focus trapping in modals
+   - Screen reader support — semantic HTML, ARIA labels where needed, alt text on images
+   - Touch targets — 44×44 pixel minimum for touch interfaces
+   - `prefers-reduced-motion` and `prefers-color-scheme` handled
+
+2. **Interaction States (MANDATORY for every interactive element)**
+   Every button, link, input, form, and interactive component MUST explicitly specify:
+   - Default (resting)
+   - Hover (mouse) — with visual feedback
+   - Focus (keyboard) — with visible focus ring
+   - Active (pressed) — momentary state during interaction
+   - Disabled — visually distinct, not interactive, announced to screen readers
+   - Loading — when async operation in progress (skeleton preferred over spinner for content)
+   - Error — when validation fails, with clear message and recovery path
+   - Success — when operation completes, with confirmation feedback
+   - Empty — when data is absent (must specify what the user sees and what they can do)
+
+3. **User Flow Coverage (MANDATORY)**
+   For every feature in this phase, specify:
+   - Happy path — the ideal flow when everything works
+   - Error path — what happens when something fails (network, validation, permission, timeout)
+   - Empty state — what the user sees before any data exists
+   - Loading state — what the user sees while waiting
+   - Edge cases — first-time user, power user, slow network, offline
+
+4. **Responsive Strategy**
+   - Mobile-first breakpoints specified (e.g., 640/768/1024/1280px)
+   - Content reflow behavior at narrow widths
+   - Touch and mouse both work on applicable devices
+   - Typography scales appropriately
+
+5. **Information Hierarchy**
+   - Primary action identified and visually dominant
+   - Secondary actions placed appropriately
+   - Progressive disclosure for complex interfaces
+   - Eye path consideration (top-left to bottom-right in LTR)
+
+6. **Component Reuse (refactor-first for UI)**
+   - Before specifying a NEW component, check if an existing one can be extended or composed
+   - Document which existing components are being reused and which (if any) are new
+   - Justify any new components — why can't the existing system serve this need?
+
+7. **Micro-interactions & Timing**
+   - Feedback within 100ms of user action
+   - Transition timing 150-300ms for most animations
+   - Loading skeletons for content, spinners only for short operations
+
+8. **Typography, Spacing, Color**
+   - Uses the project's type scale consistently (no magic numbers)
+   - Spacing follows the system
+   - Semantic color tokens (not raw hex in components)
+   - Dark mode considered if applicable per DESIGN-SYSTEM.md
+</ux_designer_requirements>
 
 <output>
 Write to: {phase_dir}/{padded_phase}-UI-SPEC.md
@@ -165,14 +264,45 @@ Read /Users/phillipdougherty/.claude/agents/gsd-ui-checker.md for instructions.
 
 <objective>
 Validate UI design contract for Phase {phase_number}: {phase_name}
-Check all 6 dimensions. Return APPROVED or BLOCKED.
+Check all dimensions including DESIGN-SYSTEM.md compliance. Return APPROVED or BLOCKED.
 </objective>
 
 <files_to_read>
 - {phase_dir}/{padded_phase}-UI-SPEC.md (UI Design Contract — PRIMARY INPUT)
 - {context_path} (USER DECISIONS — check compliance)
 - {research_path} (Technical Research — check stack alignment)
+- {DESIGN_SYSTEM_PATH} (Project UX & accessibility standards — MANDATORY, verify UI-SPEC complies with this)
 </files_to_read>
+
+<ux_checker_requirements>
+In addition to the 6 standard dimensions, verify the UI-SPEC complies with DESIGN-SYSTEM.md:
+
+**Accessibility checks:**
+- [ ] Color contrast ratios specified and meet WCAG 2.1 AA (4.5:1 normal, 3:1 large)
+- [ ] Keyboard navigation specified for every interactive element
+- [ ] Focus states visible and specified
+- [ ] Touch targets 44×44 minimum where applicable
+- [ ] ARIA labels specified where needed
+- [ ] `prefers-reduced-motion` handling addressed
+
+**Interaction state completeness:**
+- [ ] Every interactive element has all required states: default, hover, focus, active, disabled, loading, error, success, empty
+- [ ] Missing states are explicitly called out as intentional (e.g., "no loading state because action is synchronous")
+
+**User flow coverage:**
+- [ ] Happy path designed
+- [ ] Error path designed (network, validation, permission, timeout)
+- [ ] Empty state designed
+- [ ] Loading state designed
+- [ ] At least one edge case considered (first-time user, offline, slow network)
+
+**Component reuse:**
+- [ ] Existing components identified and reused where possible
+- [ ] New components justified — explanation of why existing system can't serve
+
+**If any of these checks fail, return ## ISSUES FOUND with specific remediation needed.**
+**FLAG (non-blocking) items can include: suggested but not mandatory improvements, polish items, optional accessibility enhancements beyond WCAG AA.**
+</ux_checker_requirements>
 
 <config>
 ui_safety_gate: {ui_safety_gate config value}

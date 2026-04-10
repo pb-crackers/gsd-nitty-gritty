@@ -203,6 +203,7 @@ cat .planning/SECURITY.md 2>/dev/null
 cat .planning/APIS.md 2>/dev/null
 cat .planning/TESTING-STRATEGY.md 2>/dev/null
 cat .planning/ERROR-HANDLING.md 2>/dev/null
+cat .planning/DESIGN-SYSTEM.md 2>/dev/null
 ```
 
 Extract from these:
@@ -213,6 +214,7 @@ Extract from these:
 - **APIS.md** — API design standards, data access patterns (inform API/database gray areas)
 - **TESTING-STRATEGY.md** — Testing boundaries (inform testing-related decisions)
 - **ERROR-HANDLING.md** — Error handling patterns (inform error response gray areas)
+- **DESIGN-SYSTEM.md** — UX standards, accessibility, interaction states, responsive strategy (inform UI/UX gray areas)
 
 Use the project standards artifacts to ground gray area discussions. For example, if discussing an API phase, reference established API naming conventions from APIS.md rather than asking the user to decide from scratch. Gray areas should focus on decisions NOT already covered by these standards.
 

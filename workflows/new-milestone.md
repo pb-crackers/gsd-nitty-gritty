@@ -93,6 +93,7 @@ SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
 APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
 TESTING_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
 ERRORS_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
 ```
 
 **If any artifact is missing:**
@@ -104,6 +105,7 @@ ${SECURITY_EXISTS == "false" ? "  - SECURITY.md" : ""}
 ${APIS_EXISTS == "false" ? "  - APIS.md" : ""}
 ${TESTING_EXISTS == "false" ? "  - TESTING-STRATEGY.md" : ""}
 ${ERRORS_EXISTS == "false" ? "  - ERROR-HANDLING.md" : ""}
+${DESIGN_EXISTS == "false" ? "  - DESIGN-SYSTEM.md" : ""}
 
 Generating missing artifacts...
 ```

@@ -907,7 +907,7 @@ Display stage banner:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Generate four project standards artifacts in `.planning/`. These are opinionated defaults tailored to the project's stack and domain (from research if available, otherwise from PROJECT.md context). They serve as living reference documents that downstream agents MUST consult during planning and execution.
+Generate five project standards artifacts in `.planning/`. These are opinionated defaults tailored to the project's stack and domain (from research if available, otherwise from PROJECT.md context). They serve as living reference documents that downstream agents MUST consult during planning and execution.
 
 **Generate each file using the project's stack, domain, and requirements context:**
 
@@ -967,6 +967,45 @@ Each item should include a "How to verify" note so the planner can generate acce
 - **Global Error Handling** — Catch-all middleware/handler, consistent response format, graceful degradation over hard crashes
 - **Validation Errors** — Return all validation failures at once (not one-at-a-time), field-level error mapping for forms
 
+**5. `.planning/DESIGN-SYSTEM.md`** — UX and design standards (skip generation for purely headless/API-only projects, but still create the file with "N/A — API-only project" as a marker):
+- **Accessibility (a11y)** — WCAG 2.1 AA as the baseline standard:
+  - Color contrast ratios (4.5:1 for normal text, 3:1 for large text)
+  - Keyboard navigation — every interactive element reachable via Tab, operable via Enter/Space
+  - Focus management — visible focus states, logical tab order, focus trapping in modals
+  - Screen reader support — semantic HTML, ARIA labels where needed, meaningful alt text on images
+  - Touch targets — 44×44 pixel minimum for touch interfaces
+  - Respect `prefers-reduced-motion` and `prefers-color-scheme`
+- **Interaction States (MANDATORY for every interactive element)** — Every button, link, input, and interactive component must explicitly design for:
+  - Default (resting)
+  - Hover
+  - Focus (keyboard)
+  - Active (pressed)
+  - Disabled
+  - Loading (when async operation in progress)
+  - Error (when validation fails)
+  - Success (when operation completes)
+  - Empty (when data is absent)
+- **Responsive Strategy** — Mobile-first design:
+  - Breakpoint strategy (e.g., 640px mobile, 768px tablet, 1024px desktop, 1280px wide)
+  - Content reflows gracefully at narrow widths, no horizontal scroll
+  - Typography scales appropriately
+  - Touch and mouse both work on applicable devices
+- **Information Hierarchy** — Every screen should answer:
+  - What is the primary action? (Should be visually dominant)
+  - What is the secondary action?
+  - What can be deprioritized or hidden behind progressive disclosure?
+  - What is the user's eye path? (Top-left to bottom-right in LTR contexts)
+- **User Flow Requirements (MANDATORY for every feature)** — Every feature must design for:
+  - Happy path — the ideal flow when everything works
+  - Error path — what happens when something fails (network, validation, permission)
+  - Empty state — what the user sees when there's no data yet
+  - Loading state — what the user sees while waiting
+  - Edge cases — first-time user, power user, slow network, offline
+- **Component Reuse (refactor-first applies here too)** — Before creating a new component, check if an existing component can be extended or composed. A new Button variant is better than a new ButtonV2 component.
+- **Micro-interactions & Feedback** — Every user action should produce feedback within 100ms (perceived instantaneous). Loading skeletons preferred over spinners for content. Optimistic updates where safe. Transition timing 150-300ms for most animations.
+- **Typography & Spacing** — Consistent scale (e.g., 12/14/16/20/24/32px type scale). Spacing follows a system (e.g., 4/8/12/16/24/32/48px). No magic numbers.
+- **Color Usage** — Semantic color tokens (primary, secondary, success, warning, danger, neutral), not raw hex values in components. Dark mode considered from the start if applicable.
+
 **For each artifact:**
 1. Use the project's stack (from research or PROJECT.md) to tailor recommendations to specific frameworks/libraries
 2. Include "How to verify" notes on key items so planners can generate acceptance criteria
@@ -975,7 +1014,7 @@ Each item should include a "How to verify" note so the planner can generate acce
 **Commit all artifacts:**
 
 ```bash
-node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: generate project standards (SECURITY, APIS, TESTING-STRATEGY, ERROR-HANDLING)" --files .planning/SECURITY.md .planning/APIS.md .planning/TESTING-STRATEGY.md .planning/ERROR-HANDLING.md
+node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: generate project standards (SECURITY, APIS, TESTING-STRATEGY, ERROR-HANDLING, DESIGN-SYSTEM)" --files .planning/SECURITY.md .planning/APIS.md .planning/TESTING-STRATEGY.md .planning/ERROR-HANDLING.md .planning/DESIGN-SYSTEM.md
 ```
 
 Display:
@@ -990,6 +1029,7 @@ Display:
 | API & Data Access  | `.planning/APIS.md`              |
 | Testing Strategy   | `.planning/TESTING-STRATEGY.md`  |
 | Error Handling     | `.planning/ERROR-HANDLING.md`    |
+| Design System      | `.planning/DESIGN-SYSTEM.md`     |
 ```
 
 ## 8. Create Roadmap
@@ -1143,6 +1183,7 @@ Present completion summary:
 | API & Data Access  | `.planning/APIS.md`              |
 | Testing Strategy   | `.planning/TESTING-STRATEGY.md`  |
 | Error Handling     | `.planning/ERROR-HANDLING.md`    |
+| Design System      | `.planning/DESIGN-SYSTEM.md`     |
 | Roadmap            | `.planning/ROADMAP.md`           |
 
 **[N] phases** | **[X] requirements** | Ready to build ✓
@@ -1196,6 +1237,7 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase 1 --auto")
 - `.planning/APIS.md`
 - `.planning/TESTING-STRATEGY.md`
 - `.planning/ERROR-HANDLING.md`
+- `.planning/DESIGN-SYSTEM.md`
 - `.planning/ROADMAP.md`
 - `.planning/STATE.md`
 
@@ -1213,7 +1255,7 @@ Exit skill and invoke SlashCommand("/gsd:discuss-phase 1 --auto")
 - [ ] Requirements gathered (from research or conversation)
 - [ ] User scoped each category (v1/v2/out of scope)
 - [ ] REQUIREMENTS.md created with REQ-IDs → **committed**
-- [ ] Project standards artifacts generated (SECURITY.md, APIS.md, TESTING-STRATEGY.md, ERROR-HANDLING.md) → **committed**
+- [ ] Project standards artifacts generated (SECURITY.md, APIS.md, TESTING-STRATEGY.md, ERROR-HANDLING.md, DESIGN-SYSTEM.md) → **committed**
 - [ ] gsd-roadmapper spawned with context
 - [ ] Roadmap files written immediately (not draft)
 - [ ] User feedback incorporated (if any)

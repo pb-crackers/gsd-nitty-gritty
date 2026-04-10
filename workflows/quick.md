@@ -358,6 +358,7 @@ Task(
 - .planning/APIS.md (if exists — API design & data access standards)
 - .planning/TESTING-STRATEGY.md (if exists — testing strategy)
 - .planning/ERROR-HANDLING.md (if exists — error handling patterns)
+- .planning/DESIGN-SYSTEM.md (if exists — UX & accessibility standards)
 ${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-CONTEXT.md (User decisions — locked, do not revisit)' : ''}
 ${RESEARCH_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-RESEARCH.md (Research findings — use to inform implementation choices)' : ''}
 </files_to_read>

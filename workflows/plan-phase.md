@@ -336,6 +336,7 @@ SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
 APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
 TESTING_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
 ERRORS_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
 ```
 
 **If any artifact is missing:**
@@ -352,6 +353,7 @@ SECURITY_PATH=".planning/SECURITY.md"
 APIS_PATH=".planning/APIS.md"
 TESTING_PATH=".planning/TESTING-STRATEGY.md"
 ERRORS_PATH=".planning/ERROR-HANDLING.md"
+DESIGN_PATH=".planning/DESIGN-SYSTEM.md"
 ```
 
 ## 6. Check Existing Plans
@@ -430,6 +432,7 @@ Planner prompt:
 - {APIS_PATH} (API design & data access standards — MUST reference for API/database tasks)
 - {TESTING_PATH} (Testing strategy — MUST reference for test tasks)
 - {ERRORS_PATH} (Error handling standards — MUST reference for error/validation tasks)
+- {DESIGN_PATH} (Design system & UX standards — MUST reference for any UI/frontend tasks, including accessibility, interaction states, responsive, user flows)
 </files_to_read>
 
 **Phase requirement IDs (every ID MUST appear in a plan's `requirements` field):** {phase_req_ids}
@@ -483,6 +486,7 @@ Before creating tasks, decompose the phase goal into its fundamental engineering
 - **Logging & Observability** — What events need logging? What metrics matter? Are sensitive fields excluded from logs?
 - **Performance** — Reference APIS.md Data Access section. Are there N+1 queries, unbounded lists, missing indexes? Is the query fetching only what's needed?
 - **State Management** — Where does state live? What are the transitions? What are the edge cases?
+- **UX & Accessibility** — Reference DESIGN-SYSTEM.md. For any UI/frontend work: Are all interaction states designed (default, hover, focus, active, disabled, loading, error, empty)? Is the happy path, error path, and empty state designed? Are keyboard navigation and screen reader support considered? Does it meet WCAG 2.1 AA? Are touch targets 44×44 minimum? Does it work responsive from mobile to desktop? Can existing components be reused/extended?
 
 **Skip concerns that genuinely don't apply** (a pure CSS task doesn't need a rate limiting sub-task). But document the skip:
 

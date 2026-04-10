@@ -124,6 +124,112 @@ Then **prepend** this test to the test list:
 This catches bugs that only manifest on fresh start — race conditions in startup sequences, silent seed failures, missing environment setup — which pass against warm state but break in production.
 </step>
 
+<step name="qa_depth_expansion">
+**Think like a QA engineer — expand the test list with systematic edge case exploration.**
+
+A happy-path test list is not enough. A senior QA engineer doesn't just verify "the feature works" — they probe the boundaries, poke at failure modes, and ask "what breaks this?". This step walks through systematic QA categories and adds targeted tests for each one that applies to the phase's work.
+
+**Read the SUMMARY.md files again to classify what was built:**
+
+- **Input-handling code** (forms, API endpoints, search, filters, file uploads) → Input validation tests
+- **State-changing code** (CRUD, workflows, transactions) → State transition and concurrency tests
+- **List/collection code** (feeds, tables, pagination, search results) → Boundary tests
+- **Network-dependent code** (API calls, data fetching, file uploads) → Failure mode tests
+- **UI/frontend code** → Accessibility and cross-device tests
+- **Data persistence code** (database writes, caching) → Data integrity tests
+- **Auth/permission code** → Security tests
+- **Performance-sensitive code** (large datasets, long-running ops) → Load and perceived performance tests
+
+**For each applicable category, append tests to the list. Use these templates as a starting point, tailored to the specific feature:**
+
+### Input Validation Tests (for features that accept user input)
+- **Empty input** — "Submit the form with all fields empty. Expected: clear validation errors, no crash, focus moves to first invalid field."
+- **Whitespace-only input** — "Submit with only spaces in required text fields. Expected: rejected as empty."
+- **Max length** — "Submit input at exactly the max length (e.g., 255 chars). Expected: accepted without truncation."
+- **Over max length** — "Submit input exceeding max length. Expected: clearly rejected with helpful message, no silent truncation."
+- **Unicode and emoji** — "Submit input containing emoji and non-Latin characters (中文, العربية, 🎉). Expected: stored and displayed correctly."
+- **Injection attempts** — "Submit input containing `<script>alert(1)</script>`, `'; DROP TABLE users;--`, and `${jndi:ldap://x}`. Expected: stored as plain text, rendered safely (no script execution), no SQL errors."
+- **Invalid format** — "For email field: submit 'not-an-email'. For URL: submit 'not a url'. Expected: format validation rejects with specific error."
+- **Boundary numbers** — "For numeric fields: submit 0, -1, max int, min int, decimal where integer expected. Expected: appropriate validation."
+
+### State Transition Tests (for features with state changes)
+- **Double-submit** — "Click the submit button twice rapidly. Expected: only one action occurs (button disables, request deduped, or idempotent)."
+- **Concurrent edit** — "Open the same record in two tabs. Edit and save in tab 1, then edit and save in tab 2. Expected: either last-write-wins with clear indication, or conflict detection with resolution UI."
+- **Partial completion** — "Start a multi-step operation and abandon halfway (close tab, navigate away). Expected: no orphaned data, resumable or cleanly discarded."
+- **State inconsistency probe** — "Try to perform an action in an invalid state (e.g., approve an already-approved item, delete already-deleted). Expected: graceful handling, no crash, clear feedback."
+
+### Boundary Tests (for lists, feeds, pagination, collections)
+- **Empty collection** — "Load the feature with zero items. Expected: empty state UI, not a crash or blank screen."
+- **Single item** — "Load with exactly one item. Expected: correct rendering, no 'see all' links that go nowhere."
+- **Exact page size** — "Load with exactly the page size number of items (e.g., 10 if page size is 10). Expected: no 'load more' button, no duplicate fetch."
+- **One over page size** — "Load with page size + 1 items. Expected: correct pagination, 'load more' works."
+- **Large collection** — "Load with 1000+ items. Expected: virtualization or pagination prevents UI freeze, scrolling is smooth."
+
+### Failure Mode Tests (for network-dependent code)
+- **Network offline** — "Disable network (DevTools → Offline). Attempt the action. Expected: clear error message, retry option, no silent failure."
+- **Slow network** — "Throttle to Slow 3G. Attempt the action. Expected: loading state appears within 200ms, action completes or times out gracefully."
+- **Request timeout** — "Simulate a request that takes >30s. Expected: timeout handling, user informed, retry option offered."
+- **Server error 500** — "Trigger a backend error (e.g., by sending malformed data or using a known-broken endpoint). Expected: user sees friendly error, internals not leaked, error logged with correlation ID."
+- **Partial response** — "Simulate a response that starts but never completes. Expected: eventual timeout, clean state, no hung spinner."
+
+### Accessibility Tests (for any UI work)
+- **Keyboard-only navigation** — "Using only Tab, Shift+Tab, Enter, and Space, complete the feature's primary flow. Expected: every interactive element is reachable, focus is visible, no keyboard traps."
+- **Screen reader** — "Using VoiceOver (Mac) / NVDA (Windows) / TalkBack (Android), navigate the feature. Expected: all content is announced, form fields have labels, buttons describe their purpose, status changes are announced."
+- **Zoomed text** — "Set browser text size to 200%. Expected: layout doesn't break, content remains readable, no horizontal scroll at standard widths."
+- **Reduced motion** — "Enable `prefers-reduced-motion: reduce` (DevTools → Rendering → Emulate). Expected: animations respect the preference (disabled or minimal)."
+- **Color contrast** — "Use a contrast checker on primary text/background, button text, and error messages. Expected: all meet WCAG 2.1 AA (4.5:1 normal text, 3:1 large text)."
+
+### Cross-Device/Browser Tests (for any UI work)
+- **Mobile viewport** — "View at 375px wide (iPhone SE). Expected: content reflows, nothing cut off, touch targets 44×44 min."
+- **Tablet viewport** — "View at 768px wide (iPad). Expected: appropriate layout for tablet, neither mobile nor desktop."
+- **Desktop wide** — "View at 1920px wide. Expected: content doesn't stretch awkwardly, max-width applied where needed."
+- **Touch interaction** — "On a touch device (or touch-emulated), test all interactions. Expected: no hover-only affordances, tap targets sized correctly."
+
+### Security Tests (for auth/permission code)
+- **Unauthorized access attempt** — "Log out. Try to access a protected route directly via URL. Expected: redirected to login, no data leaked."
+- **Authorization bypass probe** — "Log in as User A. Try to access User B's resources via direct URL manipulation (e.g., `/items/{B's ID}`). Expected: 403 or 404, no data leaked."
+- **Session expiry** — "Log in, wait for session to expire (or delete the session cookie), attempt an action. Expected: graceful handling, redirect to login with return URL preserved."
+- **CSRF probe** — "Trigger a state-changing action from an external origin (or via forged request). Expected: rejected due to CSRF token validation."
+
+### Data Integrity Tests (for persistence code)
+- **Refresh after write** — "Perform a write operation. Immediately refresh the page. Expected: the write persisted and is visible."
+- **Cross-device sync** — "Perform a write on device A. Check device B (different browser or incognito). Expected: the change is visible after refresh or sync."
+- **Delete and restore** — "Delete an item. Check that it's actually gone (not just hidden). Then if restore is supported, restore and verify full state returns."
+
+### Performance Tests (for performance-sensitive code)
+- **Perceived performance** — "From user action to visual feedback: is there feedback within 100ms? If not, is there a loading indicator within 200ms?"
+- **Large dataset handling** — "Load the feature with a realistic maximum dataset (e.g., power user with 10,000 items). Expected: no UI freeze, interactions remain responsive."
+- **Memory leak probe** — "Repeat the primary action 50 times (e.g., open/close a modal, navigate back and forth). Check DevTools Memory. Expected: no unbounded growth."
+
+---
+
+**For each test you add, be specific and observable.** Do not add generic tests like "test error handling" — instead: "submit form with invalid email 'abc' — expect field-level error message below the email field that says 'Please enter a valid email address'".
+
+**Skip categories that genuinely don't apply** (a phase that only adds a README doesn't need input validation tests). Document the skip in the UAT frontmatter so future maintainers know it was considered:
+
+```yaml
+qa_categories_considered:
+  input_validation: applied (3 tests)
+  state_transitions: applied (2 tests)
+  boundaries: applied (4 tests)
+  failure_modes: applied (2 tests)
+  accessibility: applied (5 tests)
+  cross_device: applied (3 tests)
+  security: N/A — no auth/permission code in this phase
+  data_integrity: N/A — no persistence changes
+  performance: N/A — small dataset, no long-running ops
+```
+
+**Prioritize QA tests that target the biggest risks:**
+- If this is auth work → security tests are critical
+- If this is a form → input validation tests are critical
+- If this is a list view → boundary tests are critical
+- If this is real-time data → failure mode tests are critical
+- If this is a CRUD UI → data integrity + accessibility are critical
+
+**You are not trying to test everything — you are trying to catch the bugs that would embarrass the team in production.** Quality over quantity. 5 well-chosen edge case tests beat 50 generic ones.
+</step>
+
 <step name="create_uat_file">
 **Create UAT file with all tests:**
 
@@ -571,6 +677,8 @@ Default to **major** if unclear. User can correct if needed.
 
 <success_criteria>
 - [ ] UAT file created with all tests from SUMMARY.md
+- [ ] QA depth expansion applied — systematic edge case tests added based on what was built
+- [ ] QA categories considered documented in UAT frontmatter (applied vs N/A with reasoning)
 - [ ] Tests presented one at a time with expected behavior
 - [ ] User responses processed as pass/issue/skip
 - [ ] Severity inferred from description (never asked)

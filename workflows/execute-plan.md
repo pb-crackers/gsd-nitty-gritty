@@ -143,10 +143,11 @@ Deviations are normal — handle via rules below.
      3. Does this task introduce a new abstraction (new class, new module, new utility, new wrapper)? If yes, justify why existing abstractions can't serve this purpose.
      4. Review the `<refactor_check>` field — examine every listed file before creating new code in the same domain.
      5. **The default answer is REFACTOR. New code requires justification.** If new code IS necessary, document the justification in the commit message under a `Refactor analysis:` line.
-   - **MANDATORY standards check:** For tasks involving security, APIs, database queries, error handling, or testing:
-     - Read the relevant project standards artifact (`.planning/SECURITY.md`, `.planning/APIS.md`, `.planning/TESTING-STRATEGY.md`, `.planning/ERROR-HANDLING.md`)
+   - **MANDATORY standards check:** For tasks involving security, APIs, database queries, error handling, testing, or UI/frontend:
+     - Read the relevant project standards artifact (`.planning/SECURITY.md`, `.planning/APIS.md`, `.planning/TESTING-STRATEGY.md`, `.planning/ERROR-HANDLING.md`, `.planning/DESIGN-SYSTEM.md`)
      - Verify the implementation aligns with the documented standards
      - For database migrations: ensure all SQL is idempotent (`IF NOT EXISTS`, `IF EXISTS` guards) per APIS.md Migration Safety section
+     - For UI/frontend tasks: verify all required interaction states are implemented (default, hover, focus, active, disabled, loading, error, empty), accessibility requirements are met (keyboard nav, WCAG contrast, screen reader labels), and responsive behavior works per DESIGN-SYSTEM.md
    - `type="auto"`: if `tdd="true"` → TDD execution. Implement with deviation rules + auth gates. Verify done criteria. Commit (see task_commit). Track hash for Summary.
    - `type="checkpoint:*"`: STOP → checkpoint_protocol → wait for user → continue only after confirmation.
    - **MANDATORY acceptance_criteria check:** After completing each task, if it has `<acceptance_criteria>`, verify EVERY criterion before moving to the next task. Use grep, file reads, or CLI commands to confirm each criterion. If any criterion fails, fix the implementation before proceeding. Do not skip criteria or mark them as "will verify later".
@@ -472,6 +473,7 @@ After execution, check if the work introduced patterns that should be reflected 
 - **APIS.md** — New API versioning approach, new query pattern, new migration pattern, new pagination strategy
 - **TESTING-STRATEGY.md** — New test pattern, new testing tool, new coverage boundary
 - **ERROR-HANDLING.md** — New error classification, new retry pattern, new error code
+- **DESIGN-SYSTEM.md** — New component variant, new interaction pattern, new accessibility decision, new breakpoint, new micro-interaction timing
 
 **Only update if the execution genuinely introduced something new.** Don't update for standard implementations that follow existing patterns. When updating, append to the relevant section rather than rewriting.
 

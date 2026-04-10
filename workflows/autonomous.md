@@ -288,6 +288,7 @@ cat .planning/SECURITY.md 2>/dev/null
 cat .planning/APIS.md 2>/dev/null
 cat .planning/TESTING-STRATEGY.md 2>/dev/null
 cat .planning/ERROR-HANDLING.md 2>/dev/null
+cat .planning/DESIGN-SYSTEM.md 2>/dev/null
 ```
 
 Extract from these:
@@ -298,6 +299,7 @@ Extract from these:
 - **APIS.md** — API design & data access standards (use to pre-answer API grey areas)
 - **TESTING-STRATEGY.md** — Testing boundaries (use to pre-answer testing grey areas)
 - **ERROR-HANDLING.md** — Error handling patterns (use to pre-answer error handling grey areas)
+- **DESIGN-SYSTEM.md** — UX & accessibility standards (use to pre-answer UI/UX grey areas)
 
 When generating grey area proposals, use project standards artifacts to inform recommended answers. For example, if a grey area is "How should API errors be formatted?", the recommended answer should reference ERROR-HANDLING.md's established pattern rather than proposing something new.
 
