@@ -37,6 +37,26 @@ Group gaps by priority from REQUIREMENTS.md:
 
 For integration/flow gaps, infer priority from affected requirements.
 
+## 2.5. Tag Gaps with Standards Artifact
+
+Before grouping, tag each gap with the standards artifact that governs it. Downstream `plan-phase` reads the tag and loads the relevant artifact immediately — no need to re-classify the gap from scratch.
+
+If the audit YAML includes a `standards.violations` block (from `audit-milestone.md` section 5.6), each violation is already tagged with its artifact. Carry the tag forward.
+
+For requirement/integration/flow gaps not pre-tagged, infer the artifact from gap content:
+
+| Gap signals | Standards artifact |
+|-------------|--------------------|
+| auth, session, login, CSRF, CORS, permission, rate limit, secret, sanitize | SECURITY.md |
+| endpoint, route, query, migration, pagination, schema, transaction, index | APIS.md |
+| test, coverage, mock, fixture, regression | TESTING-STRATEGY.md |
+| error, exception, retry, fallback, log, correlation, circuit breaker | ERROR-HANDLING.md |
+| UI, component, accessibility, contrast, hover, focus, breakpoint, interaction state | DESIGN-SYSTEM.md |
+
+A gap may map to multiple artifacts (e.g., a missing auth-guarded endpoint touches both SECURITY.md and APIS.md). Tag all that apply.
+
+If a gap maps to a standards artifact that does not exist in the project, surface this in the closure plan: "This gap suggests SECURITY.md should exist — recommend generating via `/gsd:new-milestone` before fix phase."
+
 ## 3. Group Gaps into Phases
 
 Cluster related gaps into logical phases:
@@ -44,21 +64,26 @@ Cluster related gaps into logical phases:
 **Grouping rules:**
 - Same affected phase → combine into one fix phase
 - Same subsystem (auth, API, UI) → combine
+- **Same standards artifact tag → combine** (gaps governed by the same documented policy belong in one phase so that policy gets one focused, consistent fix)
 - Dependency order (fix stubs before wiring)
 - Keep phases focused: 2-4 tasks each
 
 **Example grouping:**
 ```
-Gap: DASH-01 unsatisfied (Dashboard doesn't fetch)
-Gap: Integration Phase 1→3 (Auth not passed to API calls)
-Gap: Flow "View dashboard" broken at data fetch
+Gap: DASH-01 unsatisfied (Dashboard doesn't fetch) [APIS.md]
+Gap: Integration Phase 1→3 (Auth not passed to API calls) [SECURITY.md, APIS.md]
+Gap: Flow "View dashboard" broken at data fetch [APIS.md]
 
 → Phase 6: "Wire Dashboard to API"
-  - Add fetch to Dashboard.tsx
-  - Include auth header in fetch
+  Standards: SECURITY.md (auth header propagation) + APIS.md (fetch pattern)
+  Closes:
+  - Add fetch to Dashboard.tsx (per APIS.md fetch pattern)
+  - Include auth header in fetch (per SECURITY.md session handling)
   - Handle response, update state
   - Render user data
 ```
+
+Each generated phase description should include the standards tags so downstream `plan-phase` loads the relevant artifacts as part of its standards check.
 
 ## 4. Determine Phase Numbers
 
@@ -83,12 +108,14 @@ New phases continue from there:
 ### Proposed Phases
 
 **Phase {N}: {Name}**
+Standards: {comma-separated artifact tags, or "none — generic fix"}
 Closes:
 - {REQ-ID}: {description}
 - Integration: {from} → {to}
 Tasks: {count}
 
 **Phase {N+1}: {Name}**
+Standards: {comma-separated artifact tags}
 Closes:
 - {REQ-ID}: {description}
 - Flow: {flow name}

@@ -124,10 +124,36 @@ Then **prepend** this test to the test list:
 This catches bugs that only manifest on fresh start — race conditions in startup sequences, silent seed failures, missing environment setup — which pass against warm state but break in production.
 </step>
 
+<step name="load_project_standards">
+**Load the project's standards artifacts before expanding QA tests.**
+
+The project has documented policies for security, APIs, error handling, testing, and UX design. QA tests should verify those specific policies are enforced — not just the generic best-practice templates below. Tests tailored to your project's actual standards catch the bugs that matter; generic tests produce noise.
+
+```bash
+SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
+APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+ERROR_HANDLING_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+
+if [[ "$SECURITY_EXISTS" == "true" ]]; then cat .planning/SECURITY.md; fi
+if [[ "$APIS_EXISTS" == "true" ]]; then cat .planning/APIS.md; fi
+if [[ "$TESTING_STRATEGY_EXISTS" == "true" ]]; then cat .planning/TESTING-STRATEGY.md; fi
+if [[ "$ERROR_HANDLING_EXISTS" == "true" ]]; then cat .planning/ERROR-HANDLING.md; fi
+if [[ "$DESIGN_SYSTEM_EXISTS" == "true" ]]; then cat .planning/DESIGN-SYSTEM.md; fi
+```
+
+**Extract the enforceable policies** from each artifact that exists (bullets with concrete rules: "CSRF tokens on state-changing endpoints", "4.5:1 contrast ratio for normal text", "correlation IDs in error logs", etc.). These policies become the *expected behaviors* for the QA tests below.
+
+**If a standards artifact is absent:** fall back to the generic templates below but note in the UAT frontmatter `qa_standards_source: default` so future maintainers know the tests were not tailored to documented project policies.
+</step>
+
 <step name="qa_depth_expansion">
-**Think like a QA engineer — expand the test list with systematic edge case exploration.**
+**Think like a QA engineer — expand the test list with systematic edge case exploration, grounded in the project's documented standards.**
 
 A happy-path test list is not enough. A senior QA engineer doesn't just verify "the feature works" — they probe the boundaries, poke at failure modes, and ask "what breaks this?". This step walks through systematic QA categories and adds targeted tests for each one that applies to the phase's work.
+
+**The generic templates below are starting points, not end points.** For each category, first check the corresponding standards artifact (loaded in `load_project_standards`) and tailor the tests to verify the *specific* policies documented there. A project with SECURITY.md that mandates "session tokens expire after 30 minutes of inactivity" should get a QA test for that exact timeout — not a generic "test session expiry."
 
 **Read the SUMMARY.md files again to classify what was built:**
 
@@ -143,6 +169,7 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 **For each applicable category, append tests to the list. Use these templates as a starting point, tailored to the specific feature:**
 
 ### Input Validation Tests (for features that accept user input)
+*Standards source: APIS.md (input validation patterns) + SECURITY.md (injection/XSS policies). If APIS.md documents specific validation rules — max lengths, regex patterns, rejected character classes — generate tests for those exact rules. If SECURITY.md lists required sanitization steps, verify each is applied on the inputs this phase added.*
 - **Empty input** — "Submit the form with all fields empty. Expected: clear validation errors, no crash, focus moves to first invalid field."
 - **Whitespace-only input** — "Submit with only spaces in required text fields. Expected: rejected as empty."
 - **Max length** — "Submit input at exactly the max length (e.g., 255 chars). Expected: accepted without truncation."
@@ -153,12 +180,14 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 - **Boundary numbers** — "For numeric fields: submit 0, -1, max int, min int, decimal where integer expected. Expected: appropriate validation."
 
 ### State Transition Tests (for features with state changes)
+*Standards source: APIS.md (transaction scoping, idempotency, concurrency patterns) + ERROR-HANDLING.md (how failed transitions surface to users). If APIS.md documents how concurrent writes should be resolved (last-write-wins / optimistic locking / conflict UI), test the phase's implementation of that specific rule.*
 - **Double-submit** — "Click the submit button twice rapidly. Expected: only one action occurs (button disables, request deduped, or idempotent)."
 - **Concurrent edit** — "Open the same record in two tabs. Edit and save in tab 1, then edit and save in tab 2. Expected: either last-write-wins with clear indication, or conflict detection with resolution UI."
 - **Partial completion** — "Start a multi-step operation and abandon halfway (close tab, navigate away). Expected: no orphaned data, resumable or cleanly discarded."
 - **State inconsistency probe** — "Try to perform an action in an invalid state (e.g., approve an already-approved item, delete already-deleted). Expected: graceful handling, no crash, clear feedback."
 
 ### Boundary Tests (for lists, feeds, pagination, collections)
+*Standards source: APIS.md (pagination strategy, query-level limits, aggregation rules). If APIS.md mandates cursor-based pagination over LIMIT/OFFSET for large datasets, verify the phase uses the documented approach and test behavior at the exact page sizes it specifies.*
 - **Empty collection** — "Load the feature with zero items. Expected: empty state UI, not a crash or blank screen."
 - **Single item** — "Load with exactly one item. Expected: correct rendering, no 'see all' links that go nowhere."
 - **Exact page size** — "Load with exactly the page size number of items (e.g., 10 if page size is 10). Expected: no 'load more' button, no duplicate fetch."
@@ -166,6 +195,7 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 - **Large collection** — "Load with 1000+ items. Expected: virtualization or pagination prevents UI freeze, scrolling is smooth."
 
 ### Failure Mode Tests (for network-dependent code)
+*Standards source: ERROR-HANDLING.md (retry strategy, error classification, user-facing vs internal errors, circuit breakers). Tests should verify the phase implements the project's documented retry pattern (exponential backoff parameters, max retry counts, circuit-breaker thresholds) — not generic retry behavior.*
 - **Network offline** — "Disable network (DevTools → Offline). Attempt the action. Expected: clear error message, retry option, no silent failure."
 - **Slow network** — "Throttle to Slow 3G. Attempt the action. Expected: loading state appears within 200ms, action completes or times out gracefully."
 - **Request timeout** — "Simulate a request that takes >30s. Expected: timeout handling, user informed, retry option offered."
@@ -173,6 +203,7 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 - **Partial response** — "Simulate a response that starts but never completes. Expected: eventual timeout, clean state, no hung spinner."
 
 ### Accessibility Tests (for any UI work)
+*Standards source: DESIGN-SYSTEM.md (WCAG level, required interaction states, touch target sizes, reduced-motion policy, screen reader expectations). Tests should verify the *specific* a11y requirements documented there — e.g., if DESIGN-SYSTEM.md mandates WCAG 2.2 AA and 4.5:1 contrast with a 48×48 touch target minimum, test those exact numbers, not generic WCAG guidance.*
 - **Keyboard-only navigation** — "Using only Tab, Shift+Tab, Enter, and Space, complete the feature's primary flow. Expected: every interactive element is reachable, focus is visible, no keyboard traps."
 - **Screen reader** — "Using VoiceOver (Mac) / NVDA (Windows) / TalkBack (Android), navigate the feature. Expected: all content is announced, form fields have labels, buttons describe their purpose, status changes are announced."
 - **Zoomed text** — "Set browser text size to 200%. Expected: layout doesn't break, content remains readable, no horizontal scroll at standard widths."
@@ -180,23 +211,27 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 - **Color contrast** — "Use a contrast checker on primary text/background, button text, and error messages. Expected: all meet WCAG 2.1 AA (4.5:1 normal text, 3:1 large text)."
 
 ### Cross-Device/Browser Tests (for any UI work)
+*Standards source: DESIGN-SYSTEM.md (breakpoint strategy, mobile-first rules, supported viewports). Use the breakpoints documented in DESIGN-SYSTEM.md, not generic breakpoints. If the project supports specific browsers/devices, test those.*
 - **Mobile viewport** — "View at 375px wide (iPhone SE). Expected: content reflows, nothing cut off, touch targets 44×44 min."
 - **Tablet viewport** — "View at 768px wide (iPad). Expected: appropriate layout for tablet, neither mobile nor desktop."
 - **Desktop wide** — "View at 1920px wide. Expected: content doesn't stretch awkwardly, max-width applied where needed."
 - **Touch interaction** — "On a touch device (or touch-emulated), test all interactions. Expected: no hover-only affordances, tap targets sized correctly."
 
 ### Security Tests (for auth/permission code)
+*Standards source: SECURITY.md (auth mechanism, session policy, CSRF/CORS rules, data protection, input sanitization, rate limiting). Every SECURITY.md policy that applies to this phase should have at least one QA test — unauthorized access, authz bypass, session expiry timing, CSRF token validation, rate-limit thresholds. If SECURITY.md is absent, note the gap and recommend generating it.*
 - **Unauthorized access attempt** — "Log out. Try to access a protected route directly via URL. Expected: redirected to login, no data leaked."
 - **Authorization bypass probe** — "Log in as User A. Try to access User B's resources via direct URL manipulation (e.g., `/items/{B's ID}`). Expected: 403 or 404, no data leaked."
 - **Session expiry** — "Log in, wait for session to expire (or delete the session cookie), attempt an action. Expected: graceful handling, redirect to login with return URL preserved."
 - **CSRF probe** — "Trigger a state-changing action from an external origin (or via forged request). Expected: rejected due to CSRF token validation."
 
 ### Data Integrity Tests (for persistence code)
+*Standards source: APIS.md (data access patterns, transaction scoping, migration safety, backfill rules) + TESTING-STRATEGY.md (test against real DB, not mocks). Integrity tests run against the real test database per TESTING-STRATEGY.md — never against mocks. Verify the phase honors APIS.md's documented transaction boundaries and migration guards.*
 - **Refresh after write** — "Perform a write operation. Immediately refresh the page. Expected: the write persisted and is visible."
 - **Cross-device sync** — "Perform a write on device A. Check device B (different browser or incognito). Expected: the change is visible after refresh or sync."
 - **Delete and restore** — "Delete an item. Check that it's actually gone (not just hidden). Then if restore is supported, restore and verify full state returns."
 
 ### Performance Tests (for performance-sensitive code)
+*Standards source: APIS.md (query performance, N+1 prevention, index-aware design, connection management). Verify the phase's performance-sensitive code honors APIS.md's documented rules — no loops with DB calls inside, queries use existing indexes, pagination at query level.*
 - **Perceived performance** — "From user action to visual feedback: is there feedback within 100ms? If not, is there a loading indicator within 200ms?"
 - **Large dataset handling** — "Load the feature with a realistic maximum dataset (e.g., power user with 10,000 items). Expected: no UI freeze, interactions remain responsive."
 - **Memory leak probe** — "Repeat the primary action 50 times (e.g., open/close a modal, navigate back and forth). Check DevTools Memory. Expected: no unbounded growth."
@@ -208,13 +243,20 @@ A happy-path test list is not enough. A senior QA engineer doesn't just verify "
 **Skip categories that genuinely don't apply** (a phase that only adds a README doesn't need input validation tests). Document the skip in the UAT frontmatter so future maintainers know it was considered:
 
 ```yaml
+qa_standards_source: tailored  # "tailored" when tests were derived from project standards artifacts; "default" when generic templates were used because artifacts were absent
+qa_standards_artifacts_used:
+  - .planning/SECURITY.md
+  - .planning/DESIGN-SYSTEM.md
+  - .planning/APIS.md
+  - .planning/ERROR-HANDLING.md
+  - .planning/TESTING-STRATEGY.md
 qa_categories_considered:
-  input_validation: applied (3 tests)
-  state_transitions: applied (2 tests)
-  boundaries: applied (4 tests)
-  failure_modes: applied (2 tests)
-  accessibility: applied (5 tests)
-  cross_device: applied (3 tests)
+  input_validation: applied (3 tests — derived from APIS.md validation rules)
+  state_transitions: applied (2 tests — derived from APIS.md concurrency policy)
+  boundaries: applied (4 tests — derived from APIS.md pagination rules)
+  failure_modes: applied (2 tests — derived from ERROR-HANDLING.md retry pattern)
+  accessibility: applied (5 tests — derived from DESIGN-SYSTEM.md WCAG requirements)
+  cross_device: applied (3 tests — derived from DESIGN-SYSTEM.md breakpoints)
   security: N/A — no auth/permission code in this phase
   data_integrity: N/A — no persistence changes
   performance: N/A — small dataset, no long-running ops
@@ -677,7 +719,10 @@ Default to **major** if unclear. User can correct if needed.
 
 <success_criteria>
 - [ ] UAT file created with all tests from SUMMARY.md
+- [ ] Project standards artifacts loaded (SECURITY.md / APIS.md / TESTING-STRATEGY.md / ERROR-HANDLING.md / DESIGN-SYSTEM.md where they exist)
 - [ ] QA depth expansion applied — systematic edge case tests added based on what was built
+- [ ] QA tests tailored to the specific policies documented in project standards (not just generic templates)
+- [ ] qa_standards_source frontmatter recorded (`tailored` when artifacts used, `default` when absent)
 - [ ] QA categories considered documented in UAT frontmatter (applied vs N/A with reasoning)
 - [ ] Tests presented one at a time with expected behavior
 - [ ] User responses processed as pass/issue/skip

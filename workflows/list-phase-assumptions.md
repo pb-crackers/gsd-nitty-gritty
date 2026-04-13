@@ -50,7 +50,19 @@ Continue to analyze_phase.
 </step>
 
 <step name="analyze_phase">
-Based on roadmap description and project context, identify assumptions across five areas:
+Before listing assumptions, detect which standards artifacts exist — they shape several assumption categories below.
+
+```bash
+SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
+APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+ERROR_HANDLING_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+```
+
+Read each existing artifact so the analysis below can ground its standards-related assumptions in actual documented policies.
+
+Based on roadmap description and project context, identify assumptions across six areas:
 
 **1. Technical Approach:**
 What libraries, frameworks, patterns, or tools would Claude use?
@@ -82,6 +94,22 @@ What does Claude assume exists or needs to be in place?
 - "External dependencies: Y, Z"
 - "This will be consumed by..."
 
+**6. Standards Compliance:**
+What is Claude assuming about how this phase maps onto the project's documented standards? Surface these assumptions explicitly — they're the most expensive class of misunderstanding to catch late.
+
+For each existing standards artifact, surface phase-specific assumptions:
+
+- **SECURITY.md** (if present): "I'm assuming the new endpoint(s) use the existing auth middleware pattern from SECURITY.md…", "I'm assuming session token handling follows the documented expiry policy…", "I'm assuming inputs are sanitized via the documented helper…"
+- **APIS.md** (if present): "I'm assuming the new endpoint follows the documented pagination strategy (cursor vs LIMIT/OFFSET)…", "I'm assuming migrations use the documented idempotent guard pattern…", "I'm assuming queries use existing indexes per the documented data-access rules…"
+- **TESTING-STRATEGY.md** (if present): "I'm assuming tests will run against real dependencies per the no-mocks rule (no mocks of owned code; only acceptable mock boundaries are external paid APIs without sandbox, clock, RNG)…", "I'm assuming the unit/integration/E2E split follows the documented boundaries…"
+- **ERROR-HANDLING.md** (if present): "I'm assuming new error paths emit correlation IDs per the documented logging policy…", "I'm assuming retries use the documented exponential-backoff parameters…", "I'm assuming user-facing errors follow the documented format…"
+- **DESIGN-SYSTEM.md** (if present): "I'm assuming new interactive elements implement all required interaction states per DESIGN-SYSTEM.md (default/hover/focus/active/disabled/loading/error/empty)…", "I'm assuming a11y compliance at the documented WCAG level with documented contrast ratios and touch-target sizes…"
+
+For each artifact that does NOT exist, flag the absence as an assumption itself:
+- "No SECURITY.md exists — I'll apply general security best practices, but the project lacks an authoritative auth/session/CSRF policy. Recommend generating SECURITY.md before this phase ships."
+- "No TESTING-STRATEGY.md exists — I'll apply the GSD default no-mocks philosophy unless overridden. Recommend generating TESTING-STRATEGY.md to lock the testing posture."
+- (etc.)
+
 Be honest about uncertainty. Mark assumptions with confidence levels:
 - "Fairly confident: ..." (clear from roadmap)
 - "Assuming: ..." (reasonable inference)
@@ -112,6 +140,16 @@ Present assumptions in a clear, scannable format:
 **From prior phases:** [what's needed]
 **External:** [third-party needs]
 **Feeds into:** [what future phases need from this]
+
+### Standards Compliance
+**Per existing standards artifact:**
+- SECURITY.md → [phase-specific assumptions about auth/session/CSRF/etc., or "artifact absent — applying general best practices"]
+- APIS.md → [phase-specific assumptions about pagination/validation/migrations/etc., or "artifact absent"]
+- TESTING-STRATEGY.md → [phase-specific assumptions about test approach + no-mocks rule, or "artifact absent — applying GSD default no-mocks fallback"]
+- ERROR-HANDLING.md → [phase-specific assumptions about error paths/logging/retries, or "artifact absent"]
+- DESIGN-SYSTEM.md → [phase-specific assumptions about interaction states/a11y/breakpoints, or "artifact absent"]
+
+**Standards artifacts absent that this phase suggests should exist:** [list with recommendation to generate]
 
 ---
 

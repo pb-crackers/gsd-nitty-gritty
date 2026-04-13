@@ -50,11 +50,26 @@ If "Re-audit": continue.
 
 ## 2. Gather Context Paths
 
+```bash
+DESIGN_SYSTEM_PATH=""
+if [[ -f .planning/DESIGN-SYSTEM.md ]]; then
+  DESIGN_SYSTEM_PATH=".planning/DESIGN-SYSTEM.md"
+fi
+```
+
 Build file list for auditor:
 - All SUMMARY.md files in phase dir
 - All PLAN.md files in phase dir
-- UI-SPEC.md (if exists — audit baseline)
+- UI-SPEC.md (if exists — phase-specific audit baseline)
+- DESIGN-SYSTEM.md (if exists — project-wide audit baseline; always pass it when present, even if UI-SPEC.md also exists, so audits catch design-system drift within the phase)
 - CONTEXT.md (if exists — locked decisions)
+
+**Audit baseline hierarchy** (strictest → loosest):
+1. **UI-SPEC.md** — phase-specific contract, most specific to what was built
+2. **DESIGN-SYSTEM.md** — project-wide UX contract, applies to every UI phase
+3. **Abstract 6-pillar standards** — generic fallback when neither artifact exists
+
+If both UI-SPEC.md and DESIGN-SYSTEM.md exist, audit against UI-SPEC.md primarily but cross-check compliance with DESIGN-SYSTEM.md (a phase should not extend the design system silently). If UI-SPEC.md is absent but DESIGN-SYSTEM.md exists, DESIGN-SYSTEM.md becomes the primary baseline — do not fall through to abstract standards just because UI-SPEC.md is missing.
 
 ## 3. Spawn gsd-ui-auditor
 
@@ -69,14 +84,19 @@ Read /Users/phillipdougherty/.claude/agents/gsd-ui-auditor.md for instructions.
 
 <objective>
 Conduct 6-pillar visual audit of Phase {phase_number}: {phase_name}
-{If UI-SPEC exists: "Audit against UI-SPEC.md design contract."}
-{If no UI-SPEC: "Audit against abstract 6-pillar standards."}
+
+Audit baseline hierarchy:
+{If UI-SPEC exists AND DESIGN-SYSTEM exists: "Audit primarily against UI-SPEC.md (phase contract). Cross-check compliance with DESIGN-SYSTEM.md (project-wide UX contract) — flag any phase-introduced drift from documented design-system policies."}
+{If UI-SPEC exists AND no DESIGN-SYSTEM: "Audit against UI-SPEC.md design contract."}
+{If no UI-SPEC AND DESIGN-SYSTEM exists: "Audit against DESIGN-SYSTEM.md as the project-wide UX contract — do not fall through to abstract standards just because UI-SPEC.md is absent."}
+{If no UI-SPEC AND no DESIGN-SYSTEM: "Audit against abstract 6-pillar standards (generic fallback — recommend generating DESIGN-SYSTEM.md via /gsd:new-milestone)."}
 </objective>
 
 <files_to_read>
 - {summary_paths} (Execution summaries)
 - {plan_paths} (Execution plans — what was intended)
-- {ui_spec_path} (UI Design Contract — audit baseline, if exists)
+- {ui_spec_path} (UI Design Contract — phase-specific audit baseline, if exists)
+- {design_system_path} (Project UX & accessibility standards — project-wide audit baseline, if exists)
 - {context_path} (User decisions, if exists)
 </files_to_read>
 
@@ -150,8 +170,11 @@ node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" commit "d
 - [ ] Phase validated
 - [ ] SUMMARY.md files found (execution completed)
 - [ ] Existing review handled (re-audit/view)
+- [ ] DESIGN-SYSTEM.md detected and included in auditor context when present
+- [ ] Audit baseline hierarchy applied (UI-SPEC → DESIGN-SYSTEM → abstract)
 - [ ] gsd-ui-auditor spawned with correct context
 - [ ] UI-REVIEW.md created in phase directory
+- [ ] Design-system drift flagged (if applicable)
 - [ ] Score summary displayed to user
 - [ ] Next steps presented
 </success_criteria>

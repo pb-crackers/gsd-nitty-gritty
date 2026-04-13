@@ -165,6 +165,34 @@ AskUserQuestion(
 ```
 </step>
 
+<step name="load_testing_strategy">
+Load the project's testing philosophy — this is a **mandatory** read when the file exists.
+
+```bash
+cat .planning/TESTING-STRATEGY.md 2>/dev/null
+```
+
+**If TESTING-STRATEGY.md exists:** Extract and honor:
+- The Core Principle (test real code, not mocks)
+- The Acceptable Mock Boundaries list
+- The project's unit/integration/E2E boundary definitions
+- Any project-specific test data or coverage rules
+
+**If TESTING-STRATEGY.md does not exist:** Apply the GSD default testing philosophy described below. Do not prompt the user — just proceed with these defaults and note in the final report that TESTING-STRATEGY.md should be generated via `/gsd:new-milestone` or by running the Step 7.5 artifact generation from `new-project.md`.
+
+**GSD Default Testing Philosophy (the no-mocks rule):**
+
+> We are building production applications. A test that passes against a mock tells you nothing about whether the code works in production — it only tells you the mock matches the mock. **Do not mock anything you own or control.** Real databases, real internal services, real file systems, real queues, real HTTP handlers, real domain logic.
+>
+> The only acceptable mock boundary is **external third-party services you cannot run locally** (e.g., Stripe production API, Twilio SMS delivery, a vendor SaaS endpoint) — and even there, prefer vendor-provided test modes, sandbox environments, or contract tests over hand-rolled mocks.
+>
+> Acceptable mock boundaries (the short list): (1) external paid APIs with no sandbox, (2) time/clock for deterministic scheduling tests, (3) random number generators for deterministic output tests. Everything else runs for real.
+>
+> If you find yourself reaching for a mock, stop and ask: *can I run the real thing in a container, test mode, or fixture instead?* The answer is almost always yes. Every mock must be justified in a code comment explaining which boundary category it falls under and why a real alternative is not feasible.
+
+Carry this rule into every subsequent step: test plan generation, test code generation, and the final coverage report. If the user's extra instructions (`$EXTRA_INSTRUCTIONS`) conflict with this rule, surface the conflict and ask the user to confirm before proceeding.
+</step>
+
 <step name="generate_test_plan">
 For each approved file, create a detailed test plan.
 
@@ -172,11 +200,18 @@ For each approved file, create a detailed test plan.
 1. Identify testable functions/methods in the file
 2. For each function: list input scenarios, expected outputs, edge cases
 3. Note: since code already exists, tests may pass immediately — that's OK, but verify they test the RIGHT behavior
+4. **No-mocks check:** For each planned test, explicitly note which dependencies the code under test touches (DB, queue, HTTP, filesystem, internal services). For each dependency, declare how the test will exercise it: *real in-process instance*, *real containerized instance*, *vendor sandbox/test mode*, or *justified mock* (must name the external-boundary category). If a unit test requires any of the above, it's actually an integration test — reclassify it.
 
 **For E2E files**, plan tests following RED-GREEN gates:
 1. Identify user scenarios from CONTEXT.md/VERIFICATION.md
 2. For each scenario: describe the user action, expected outcome, assertions
 3. Note: RED gate means confirming the test would fail if the feature were broken
+4. **Real-stack requirement:** E2E tests must run against the real application stack — real DB, real backend process, real browser. No stubbed API responses, no mocked auth, no fake fixtures pretending to be the backend. If the stack is hard to bring up, report that as a blocker rather than substituting mocks.
+
+**Before presenting the plan**, audit it against the testing philosophy loaded in `load_testing_strategy`:
+- Does any planned test reach for a mock?
+- If yes, is that mock on the acceptable-boundary short list (external paid API without sandbox / clock / RNG)?
+- If no, revise the plan to use the real dependency before presenting it.
 
 Present the complete test plan:
 
@@ -186,15 +221,28 @@ AskUserQuestion(
   question: |
     ## Test Generation Plan
 
+    ### Testing Philosophy
+    {one-line: "No mocks except external boundaries — tests run against real dependencies"}
+
     ### Unit Tests ({N} tests across {M} files)
-    {for each file: test file path, list of test cases}
+    {for each file: test file path, list of test cases, dependencies-touched note}
+
+    ### Integration Tests ({I} tests across {J} files)
+    {for each file: test file path, real DB/service setup required, test cases}
 
     ### E2E Tests ({P} tests across {Q} files)
-    {for each file: test file path, list of test scenarios}
+    {for each file: test file path, real-stack setup required, list of test scenarios}
+
+    ### Justified Mocks (must be empty or fully justified)
+    {for each mock: dependency, boundary category, why real alternative is not feasible}
 
     ### Test Commands
     - Unit: {discovered test command}
+    - Integration: {discovered integration command, if separate}
     - E2E: {discovered e2e command}
+
+    ### Setup Requirements
+    {test containers, sandbox credentials, seed data needed to run against real dependencies}
 
     Ready to generate?
   options:
@@ -215,10 +263,18 @@ For each approved TDD test:
 
 2. **Write test** with clear arrange/act/assert structure:
    ```
-   // Arrange — set up inputs and expected outputs
-   // Act — call the function under test
+   // Arrange — set up inputs and expected outputs (real fixtures, real DB rows, not mocks)
+   // Act — call the function under test through its real code path
    // Assert — verify the output matches expectations
    ```
+
+   **No-mocks enforcement during code generation:**
+   - Do NOT import mocking libraries (`jest.mock`, `vi.mock`, `sinon`, `unittest.mock`, `Moq`, `NSubstitute`, etc.) to stub code the project owns
+   - Do NOT stub internal functions, services, repositories, or controllers — call them for real
+   - For DB-touching code: use the real test database (or a test container) discovered in the test structure; if none exists, report a blocker and stop — do not fall back to mocking the DB
+   - For HTTP handlers: exercise them through the real router/framework, not by calling handler functions with fake request objects
+   - The ONLY acceptable mocks are those pre-approved in the test plan under "Justified Mocks" — each must have a code comment naming the boundary category (external paid API / clock / RNG) and why a real alternative is not feasible
+   - If you discover partway through that a real dependency is unavailable, STOP and report it as a blocker rather than silently adding a mock
 
 3. **Run the test**:
    ```bash
@@ -340,12 +396,16 @@ Present next steps:
 - [ ] All changed files classified into TDD/E2E/Skip categories
 - [ ] Classification presented to user and approved
 - [ ] Project test structure discovered (directories, conventions, runners)
+- [ ] TESTING-STRATEGY.md loaded (or GSD default no-mocks philosophy applied if missing)
+- [ ] Test plan audited against no-mocks rule before presenting to user
 - [ ] Test plan presented to user and approved
-- [ ] TDD tests generated with arrange/act/assert structure
-- [ ] E2E tests generated targeting user scenarios
+- [ ] TDD tests generated with arrange/act/assert structure using **real dependencies** (no mocks of owned code)
+- [ ] Integration tests run against real DB / real services (test containers or dedicated test DBs)
+- [ ] E2E tests run against the real application stack (no stubbed backend/API responses)
+- [ ] Any mock present in generated test code falls on the acceptable-boundary short list and is justified in a code comment
 - [ ] All tests executed — no untested tests marked as passing
 - [ ] Bugs discovered by tests flagged (not fixed)
 - [ ] Test files committed with proper message
-- [ ] Coverage gaps documented
+- [ ] Coverage gaps documented (including any areas blocked by unavailable real dependencies)
 - [ ] Next steps presented to user
 </success_criteria>

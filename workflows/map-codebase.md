@@ -82,6 +82,20 @@ mkdir -p .planning/codebase
 Continue to spawn_agents.
 </step>
 
+<step name="detect_standards_artifacts">
+Before spawning mappers, detect which project standards artifacts exist. Quality and Concerns mappers use these to flag drift between documented policy and observed code — high-value signal that's invisible without the comparison.
+
+```bash
+SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
+APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+ERROR_HANDLING_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+```
+
+Build a list of existing artifact paths to pass into Agent 3 (Quality) and Agent 4 (Concerns) prompts. If no artifacts exist, the mappers run as before — drift detection becomes a no-op rather than failing.
+</step>
+
 <step name="spawn_agents">
 Spawn 4 parallel gsd-codebase-mapper agents.
 
@@ -145,6 +159,32 @@ Write these documents to .planning/codebase/:
 - CONVENTIONS.md - Code style, naming, patterns, error handling
 - TESTING.md - Framework, structure, mocking, coverage
 
+{if APIS_EXISTS or ERROR_HANDLING_EXISTS or SECURITY_EXISTS or TESTING_STRATEGY_EXISTS:}
+**Standards artifacts to compare against** (read these before writing your output documents):
+{if APIS_EXISTS: '- .planning/APIS.md (documented API design & data access standards)'}
+{if ERROR_HANDLING_EXISTS: '- .planning/ERROR-HANDLING.md (documented error handling patterns)'}
+{if SECURITY_EXISTS: '- .planning/SECURITY.md (documented security standards)'}
+{if TESTING_STRATEGY_EXISTS: '- .planning/TESTING-STRATEGY.md (documented testing philosophy — including the no-mocks rule)'}
+
+**Drift detection (mandatory when standards artifacts exist):**
+
+In CONVENTIONS.md, add a 'Documented vs Observed' section that compares:
+- ERROR-HANDLING.md policies vs observed error handling in the codebase (correlation IDs, classification, retry patterns)
+- APIS.md policies vs observed API patterns (pagination, validation, migration guards)
+- SECURITY.md policies vs observed security primitives (CSRF, session, auth middleware)
+
+In TESTING.md, add a 'Documented vs Observed' section that compares:
+- TESTING-STRATEGY.md no-mocks rule vs actual mock usage in the codebase. Grep for mocking-library imports (jest.mock, vi.mock, sinon, unittest.mock, Moq, NSubstitute, etc.) and report counts + sample paths. Any mock of owned code is drift.
+- TESTING-STRATEGY.md unit/integration/E2E boundaries vs observed test layout
+- TESTING-STRATEGY.md coverage philosophy vs observed coverage approach
+
+For each drift entry, format as: '{policy} → {observed reality} → {drift severity}'. Severity: VIOLATION (contradicts policy), GAP (policy not yet implemented), DRIFT (extended without updating docs).
+
+If no standards artifacts exist, skip drift detection and write the documents normally — note in each document 'No standards artifacts found in .planning/ — generate them via /gsd:new-milestone for drift detection on next run.'
+{else:}
+No standards artifacts found in .planning/. Write CONVENTIONS.md and TESTING.md normally; note at the top of each: 'No standards artifacts present — recommend generating SECURITY.md / APIS.md / TESTING-STRATEGY.md / ERROR-HANDLING.md via /gsd:new-milestone to enable drift detection.'
+{endif}
+
 Explore thoroughly. Write documents directly using templates. Return confirmation only."
 )
 ```
@@ -163,6 +203,30 @@ Analyze this codebase for technical debt, known issues, and areas of concern.
 
 Write this document to .planning/codebase/:
 - CONCERNS.md - Tech debt, bugs, security, performance, fragile areas
+
+{if SECURITY_EXISTS or APIS_EXISTS or ERROR_HANDLING_EXISTS or TESTING_STRATEGY_EXISTS or DESIGN_SYSTEM_EXISTS:}
+**Standards artifacts to compare against** (read these before writing your output document):
+{if SECURITY_EXISTS: '- .planning/SECURITY.md'}
+{if APIS_EXISTS: '- .planning/APIS.md'}
+{if ERROR_HANDLING_EXISTS: '- .planning/ERROR-HANDLING.md'}
+{if TESTING_STRATEGY_EXISTS: '- .planning/TESTING-STRATEGY.md'}
+{if DESIGN_SYSTEM_EXISTS: '- .planning/DESIGN-SYSTEM.md'}
+
+**Standards Violation as a first-class concern category:**
+
+In CONCERNS.md, add a top-level 'Standards Violations' section that surfaces concrete code-level violations of documented policies. Examples:
+- SECURITY.md mandates CSRF protection but observed POST handlers lack it
+- APIS.md mandates idempotent migrations but observed migrations lack IF EXISTS guards
+- TESTING-STRATEGY.md forbids mocks of owned code but observed tests mock owned services (cite specific files)
+- ERROR-HANDLING.md mandates correlation IDs in error logs but observed error paths lack them
+- DESIGN-SYSTEM.md mandates specific interaction states but observed components only implement subset
+
+Each violation entry: file path, line number(s), policy violated, severity (BLOCKER for security/data integrity, MAJOR for functional gaps, MINOR for stylistic drift).
+
+Treat standards violations as concerns even when the code 'works' — the entire purpose of documented standards is that code which violates them will fail in production scenarios the standards were written to prevent.
+{else:}
+No standards artifacts found in .planning/. Document concerns normally; note 'Standards artifacts not present — recommend generating them via /gsd:new-milestone to surface policy-violation concerns.'
+{endif}
 
 Explore thoroughly. Write document directly using template. Return confirmation only."
 )

@@ -179,6 +179,80 @@ Extract files modified in this phase from SUMMARY.md, scan each:
 Categorize: 🛑 Blocker (prevents goal) | ⚠️ Warning (incomplete) | ℹ️ Info (notable).
 </step>
 
+<step name="scan_standards_compliance">
+**Verify phase code complies with project standards artifacts.** Generic anti-pattern scanning catches obvious stubs, but it does not catch code that's complete yet violates the project's own documented policies (e.g., an endpoint that ships without rate limiting when SECURITY.md requires it, or a migration without `IF EXISTS` guards when APIS.md mandates idempotent migrations).
+
+**Load standards artifacts** (each is optional — skip any that don't exist):
+
+```bash
+SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
+APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+ERROR_HANDLING_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+```
+
+For each existing artifact, cat its contents and extract the enforceable policies (bullets with concrete rules — not philosophical framing).
+
+**Classify each phase-modified file by domain** to decide which artifacts apply:
+
+| File domain | Signals | Relevant artifacts |
+|-------------|---------|--------------------|
+| Auth/authz | `session`, `jwt`, `cookie`, `login`, `logout`, `authorize`, `permission`, auth middleware | SECURITY.md |
+| API endpoint | route handlers, REST/GraphQL resolvers, request/response schemas | APIS.md, SECURITY.md (auth on endpoint), ERROR-HANDLING.md |
+| DB query / migration | Prisma/Sequelize/Drizzle calls, raw SQL, migration files | APIS.md (data access + migration safety) |
+| Error paths | try/catch blocks, error middleware, error classes | ERROR-HANDLING.md |
+| Test files | `.test.`, `.spec.`, `__tests__/`, test runners | TESTING-STRATEGY.md |
+| UI / frontend | `.tsx`, `.jsx`, component files, styles | DESIGN-SYSTEM.md |
+| Logging / observability | logger calls, metric emission, trace instrumentation | SECURITY.md (no sensitive data in logs), ERROR-HANDLING.md |
+
+**For each classified file, spot-check against the relevant artifact(s). Record findings:**
+
+| Finding type | Example | Severity |
+|--------------|---------|----------|
+| Policy violation | SECURITY.md requires CSRF protection on state-changing endpoints — new POST handler has no CSRF check | 🛑 Blocker |
+| Policy missing | APIS.md mandates idempotent migrations — new migration lacks `IF NOT EXISTS` / `IF EXISTS` guards | 🛑 Blocker |
+| Policy violation | TESTING-STRATEGY.md forbids mocking owned code — new test file imports `jest.mock` for a project-owned service | 🛑 Blocker |
+| Policy partial | ERROR-HANDLING.md requires correlation IDs in error logs — new error path logs stack but not correlation ID | ⚠️ Warning |
+| Policy drift | DESIGN-SYSTEM.md requires hover/focus/disabled states for interactive elements — new button only implements default + hover | ⚠️ Warning |
+| Standard absent | No SECURITY.md exists, but phase added auth code — recommend generating SECURITY.md via `/gsd:new-milestone` | ℹ️ Info |
+
+**Scan technique per artifact:**
+
+- **SECURITY.md** — For auth/authz files: grep for the auth primitives the doc mandates (CSRF tokens, session validation, input sanitization). Flag absent primitives on files that should have them.
+- **APIS.md** — For DB files: grep for `IF NOT EXISTS`, `IF EXISTS`, bare `DROP`, `N+1`-shaped queries (loops with DB calls inside), transaction scoping. For endpoint files: grep for pagination, input validation, versioning markers.
+- **TESTING-STRATEGY.md** — For test files: grep for mocking library imports against owned code paths. Any `jest.mock('../services/foo')`, `vi.mock('@/db/client')`, `sinon.stub(userRepo, ...)`, or equivalent targeting project-owned modules is a blocker.
+- **ERROR-HANDLING.md** — For error-path files: check for correlation IDs in error logs, error classification (operational vs programmer), user-facing vs internal error separation.
+- **DESIGN-SYSTEM.md** — For UI files: check for all required interaction states (default/hover/focus/active/disabled/loading/error/empty), a11y attributes (`aria-label`, `role`, semantic HTML), responsive handling.
+
+**Output:** Add findings to the VERIFICATION.md report under a new section "Standards Compliance". Schema:
+
+```yaml
+standards_compliance:
+  artifacts_checked:
+    - SECURITY.md
+    - APIS.md
+    - TESTING-STRATEGY.md
+  artifacts_missing:
+    - ERROR-HANDLING.md  # present in project? if not, note "not yet generated"
+  findings:
+    - artifact: SECURITY.md
+      file: src/api/checkout.ts
+      policy: "CSRF protection on state-changing endpoints"
+      status: violated
+      severity: blocker
+      evidence: "POST handler at line 42 does not invoke csrf middleware present in src/middleware/csrf.ts"
+    - artifact: TESTING-STRATEGY.md
+      file: src/services/user.test.ts
+      policy: "No mocks of owned code"
+      status: violated
+      severity: blocker
+      evidence: "Line 8: jest.mock('../repos/userRepo') stubs an owned repository"
+```
+
+**Any 🛑 Blocker standards-compliance finding forces phase status to `gaps_found`** — same rule as anti-pattern blockers. ⚠️ Warnings feed into phase tech debt. ℹ️ Info entries are advisory.
+</step>
+
 <step name="identify_human_verification">
 **Always needs human:** Visual appearance, user flow completion, real-time behavior (WebSocket/SSE), external service integration, performance feel, error message clarity.
 
@@ -188,9 +262,9 @@ Format each as: Test Name → What to do → Expected result → Why can't verif
 </step>
 
 <step name="determine_status">
-**passed:** All truths VERIFIED, all artifacts pass levels 1-3, all key links WIRED, no blocker anti-patterns.
+**passed:** All truths VERIFIED, all artifacts pass levels 1-3, all key links WIRED, no blocker anti-patterns, no blocker standards-compliance findings.
 
-**gaps_found:** Any truth FAILED, artifact MISSING/STUB, key link NOT_WIRED, or blocker found.
+**gaps_found:** Any truth FAILED, artifact MISSING/STUB, key link NOT_WIRED, blocker anti-pattern found, or blocker standards-compliance finding.
 
 **human_needed:** All automated checks pass but human verification items remain.
 
@@ -235,6 +309,9 @@ Orchestrator routes: `passed` → update_roadmap | `gaps_found` → create/execu
 - [ ] All key links verified
 - [ ] Requirements coverage assessed (if applicable)
 - [ ] Anti-patterns scanned and categorized
+- [ ] Standards compliance scanned against existing project artifacts (SECURITY.md / APIS.md / TESTING-STRATEGY.md / ERROR-HANDLING.md / DESIGN-SYSTEM.md)
+- [ ] Standards-compliance findings recorded in VERIFICATION.md with severity
+- [ ] Blocker standards findings force gaps_found status
 - [ ] Human verification items identified
 - [ ] Overall status determined
 - [ ] Fix plans generated (if gaps_found)

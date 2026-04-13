@@ -152,6 +152,64 @@ Add to audit YAML: `nyquist: { compliant_phases, partial_phases, missing_phases,
 
 Discovery only — never auto-calls `/gsd:validate-phase`.
 
+## 5.6. Standards Drift Detection
+
+A milestone can ship with each phase individually passing verification while the cumulative code quietly diverges from SECURITY.md, APIS.md, ERROR-HANDLING.md, TESTING-STRATEGY.md, or DESIGN-SYSTEM.md. This step surfaces drift at the milestone level.
+
+**Skip gracefully** if the project has no standards artifacts (legacy projects pre-dating the Step 7.5 artifact generation). Record `standards: { artifacts_present: false, checked: [], drift: [] }` in the audit YAML.
+
+### 5.6a. Load existing standards artifacts
+
+```bash
+SECURITY_EXISTS=$(test -f .planning/SECURITY.md && echo "true" || echo "false")
+APIS_EXISTS=$(test -f .planning/APIS.md && echo "true" || echo "false")
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+ERROR_HANDLING_EXISTS=$(test -f .planning/ERROR-HANDLING.md && echo "true" || echo "false")
+DESIGN_SYSTEM_EXISTS=$(test -f .planning/DESIGN-SYSTEM.md && echo "true" || echo "false")
+```
+
+For each artifact that exists, extract enforceable policies (concrete rules, not philosophical framing).
+
+### 5.6b. Aggregate standards-compliance findings from phase VERIFICATION.md files
+
+Phase-level standards-compliance findings are produced by `verify-phase.md`'s `scan_standards_compliance` step (see Edit 2). Aggregate them:
+
+```bash
+for phase_dir in .planning/phases/*/; do
+  if [[ -f "$phase_dir"/*-VERIFICATION.md ]]; then
+    # Parse standards_compliance.findings from YAML
+    # Collect: artifact, file, policy, status, severity, evidence
+  fi
+done
+```
+
+Build a milestone-wide findings table grouped by artifact.
+
+### 5.6c. Cross-phase drift sampling
+
+Some drift only emerges at the milestone scale (inconsistent error codes across phases, inconsistent pagination strategies, inconsistent auth patterns). Sample milestone-touched files against each standards artifact:
+
+- **SECURITY.md** — grep milestone-touched auth/endpoint files for auth primitive consistency (are all state-changing endpoints protected the same way?)
+- **APIS.md** — grep milestone migrations for consistent guard usage (`IF NOT EXISTS`); grep endpoint files for pagination consistency
+- **ERROR-HANDLING.md** — grep error paths for correlation ID presence, consistent error code ranges, consistent user-facing error format
+- **TESTING-STRATEGY.md** — grep new test files for mocking-library imports against owned code (any hit is drift)
+- **DESIGN-SYSTEM.md** — spot-check UI files for interaction-state completeness and breakpoint consistency
+
+### 5.6d. Classify per artifact
+
+| Status | Condition |
+|--------|-----------|
+| COMPLIANT | Artifact exists, no blocker or warning findings across milestone |
+| DRIFTED | Artifact exists, warning-severity findings present (phase(s) extended or partially complied with policy without updating the artifact) |
+| VIOLATED | Artifact exists, blocker-severity findings present (phase(s) violated documented policy) |
+| ABSENT | Artifact does not exist but milestone scope suggests it should (e.g., milestone added auth code but no SECURITY.md) |
+
+### 5.6e. FAIL gate
+
+**Any `VIOLATED` status on a standards artifact MUST force `gaps_found` on the milestone audit** — same rule as unsatisfied requirements. `DRIFTED` entries feed into tech debt. `ABSENT` entries feed into recommended next steps (generate the missing artifact via `/gsd:new-milestone` or the Step 7.5 generation from `new-project.md`).
+
+Discovery only — never auto-regenerates artifacts.
+
 ## 6. Aggregate into v{version}-MILESTONE-AUDIT.md
 
 Create `.planning/v{version}-v{version}-MILESTONE-AUDIT.md` with:
@@ -185,15 +243,42 @@ tech_debt:  # Non-critical, deferred
   - phase: 03-dashboard
     items:
       - "Deferred: mobile responsive layout"
+standards:  # Milestone-level standards drift detection (5.6)
+  artifacts_present: true
+  checked:
+    - SECURITY.md
+    - APIS.md
+    - TESTING-STRATEGY.md
+    - ERROR-HANDLING.md
+    - DESIGN-SYSTEM.md
+  missing: []  # e.g. ["SECURITY.md"] if milestone added auth without the artifact
+  per_artifact:
+    SECURITY.md: compliant  # compliant | drifted | violated | absent
+    APIS.md: drifted
+    TESTING-STRATEGY.md: violated
+    ERROR-HANDLING.md: compliant
+    DESIGN-SYSTEM.md: compliant
+  violations:  # forces gaps_found
+    - artifact: TESTING-STRATEGY.md
+      phase: 03-dashboard
+      file: src/api/dashboard.test.ts
+      policy: "No mocks of owned code"
+      evidence: "Line 12: jest.mock('../repos/userRepo') stubs owned repository"
+  drift:  # feeds tech_debt
+    - artifact: APIS.md
+      phase: 02-api
+      file: src/migrations/003-add-roles.sql
+      policy: "Idempotent migration guards"
+      evidence: "Missing IF NOT EXISTS on CREATE TABLE roles"
 ---
 ```
 
 Plus full markdown report with tables for requirements, phases, integration, tech debt.
 
 **Status values:**
-- `passed` — all requirements met, no critical gaps, minimal tech debt
-- `gaps_found` — critical blockers exist
-- `tech_debt` — no blockers but accumulated deferred items need review
+- `passed` — all requirements met, no critical gaps, no standards violations, minimal tech debt
+- `gaps_found` — critical blockers exist (unsatisfied requirements, broken integration, OR standards violations)
+- `tech_debt` — no blockers but accumulated deferred items or standards drift need review
 
 ## 7. Present Results
 

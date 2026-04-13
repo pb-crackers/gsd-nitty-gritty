@@ -82,15 +82,39 @@ Call AskUserQuestion with gap table and options:
 2. "Skip — mark manual-only" → add to Manual-Only, Step 6
 3. "Cancel" → exit
 
+## 4.5. Load Testing Philosophy
+
+Before spawning the auditor, load the project's testing strategy so generated tests honor the project's documented policy.
+
+```bash
+TESTING_STRATEGY_EXISTS=$(test -f .planning/TESTING-STRATEGY.md && echo "true" || echo "false")
+if [[ "$TESTING_STRATEGY_EXISTS" == "true" ]]; then
+  cat .planning/TESTING-STRATEGY.md
+fi
+```
+
+**If TESTING-STRATEGY.md exists:** Extract the Core Principle, Acceptable Mock Boundaries, and per-tier definitions. Pass these verbatim into the auditor's prompt.
+
+**If TESTING-STRATEGY.md does not exist:** Apply the GSD default no-mocks philosophy — the same fallback described in `add-tests.md` under the `load_testing_strategy` step:
+
+> We are building production applications. Do not mock anything you own or control. The only acceptable mock boundary is external third-party services you cannot run locally — and even there, prefer vendor test modes, sandbox environments, or contract tests over hand-rolled mocks. Acceptable mock boundaries (the short list): (1) external paid APIs with no sandbox, (2) time/clock for deterministic scheduling tests, (3) random number generators for deterministic output tests. Everything else runs for real. Every mock must be justified in a code comment naming its boundary category.
+
+The auditor MUST honor this rule when generating tests. If a gap can only be closed by mocking owned code, the auditor must escalate (not generate the mocked test).
+
 ## 5. Spawn gsd-nyquist-auditor
 
 ```
 Task(
   prompt="Read /Users/phillipdougherty/.claude/agents/gsd-nyquist-auditor.md for instructions.\n\n" +
-    "<files_to_read>{PLAN, SUMMARY, impl files, VALIDATION.md}</files_to_read>" +
+    "<files_to_read>{PLAN, SUMMARY, impl files, VALIDATION.md, .planning/TESTING-STRATEGY.md if exists}</files_to_read>" +
     "<gaps>{gap list}</gaps>" +
     "<test_infrastructure>{framework, config, commands}</test_infrastructure>" +
-    "<constraints>Never modify impl files. Max 3 debug iterations. Escalate impl bugs.</constraints>",
+    "<testing_philosophy>{TESTING-STRATEGY.md contents verbatim if exists, otherwise the GSD default no-mocks fallback from step 4.5}</testing_philosophy>" +
+    "<constraints>Never modify impl files. Max 3 debug iterations. Escalate impl bugs. " +
+      "NO MOCKS of owned code — do not import jest.mock, vi.mock, sinon, unittest.mock, Moq, NSubstitute, or equivalent to stub the project's own functions, services, repositories, controllers, or DB clients. " +
+      "Tests must run against real dependencies (real DB via test container or dedicated test DB, real HTTP stack, real services). " +
+      "Only acceptable mocks: external paid APIs without sandbox, clock, RNG — each must carry a code comment naming its boundary category and why a real alternative is not feasible. " +
+      "If a gap cannot be closed without mocking owned code, escalate the gap rather than generating the test.</constraints>",
   subagent_type="gsd-nyquist-auditor",
   model="{AUDITOR_MODEL}",
   description="Fill validation gaps for Phase {N}"
@@ -158,8 +182,11 @@ Display `/clear` reminder.
 - [ ] PLAN/SUMMARY files read, requirement map built
 - [ ] Test infrastructure detected
 - [ ] Gaps classified (COVERED/PARTIAL/MISSING)
+- [ ] TESTING-STRATEGY.md loaded (or GSD default no-mocks philosophy applied)
 - [ ] User gate with gap table
-- [ ] Auditor spawned with complete context
+- [ ] Auditor spawned with complete context AND testing philosophy
+- [ ] Generated tests verified to use real dependencies (no mocks of owned code)
+- [ ] Gaps requiring mocks of owned code escalated (not silently filled)
 - [ ] All three return formats handled
 - [ ] VALIDATION.md created or updated
 - [ ] Test files committed separately

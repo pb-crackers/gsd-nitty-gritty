@@ -177,6 +177,46 @@ All outcomes captured to PROJECT.md under a `## PM Validation` section. If MVP D
 
 ---
 
+### 8. No-Mocks Testing Philosophy + Standards Propagation to Every Lifecycle Workflow
+**Shipped:** Fourth wave
+**Files modified:** `new-project.md`, `add-tests.md`, `validate-phase.md`, `verify-phase.md`, `research-phase.md`, `verify-work.md`, `ui-review.md`, `audit-milestone.md`, `map-codebase.md`, `list-phase-assumptions.md`, `plan-milestone-gaps.md`
+
+**Problem:** Two related gaps surfaced at once. First, the TESTING-STRATEGY.md template had a weak no-mocks stance — it said "real DB, not mocks" as a parenthetical on one tier, but never stated the core principle that we build production applications and a mocked test only proves that the mock matches itself. Projects following the template were still writing tests that mocked owned code, which passes CI and breaks in prod. Second, only 9 of the 40 workflows referenced the standards artifacts (SECURITY/APIS/TESTING-STRATEGY/ERROR-HANDLING/DESIGN-SYSTEM). The artifacts were being generated, read during planning and execution, and then ignored by nearly every other lifecycle command — verification, UAT, research, milestone audit, codebase mapping, retroactive UI review, assumption surfacing, and gap-planning all ran without them. Standards drift could enter the codebase phase-by-phase and never get caught.
+
+**Solution:**
+
+**Part A — Authoritative no-mocks rule in the template:**
+- Rewrote the TESTING-STRATEGY.md template in `new-project.md` Step 7.5 to lead with a **Core Principle**: do not mock anything you own or control; tests must run against real databases, real internal services, real file systems, real queues, real HTTP handlers, real domain logic.
+- The only acceptable mock boundary is **external third-party services you cannot run locally** (Stripe production API, Twilio SMS delivery, vendor SaaS without a sandbox) — and even there, prefer vendor test modes / sandboxes / contract tests over hand-rolled mocks.
+- Added an explicit **Acceptable Mock Boundaries** short list: (1) external paid APIs with no sandbox, (2) time/clock for deterministic scheduling tests, (3) RNG for deterministic output tests. Everything else runs for real. Every mock must be justified in a code comment naming its boundary category.
+- Propagates automatically to `new-milestone.md` (regenerates missing artifacts from this template) and to every existing reader (`discuss-phase`, `plan-phase`, `execute-plan`, `autonomous`, `quick`).
+
+**Part B — Enforcement at the test-generating commands:**
+- `add-tests.md` and `validate-phase.md` now load TESTING-STRATEGY.md before generating tests, with a fallback to the GSD default no-mocks philosophy embedded inline (so the rule applies even on projects that pre-date the artifact).
+- Both commands now audit planned tests against the no-mocks rule **before** generating, and the generation steps forbid importing mocking libraries to stub owned code. If a test gap requires a mock of owned code, the agent must escalate rather than silently generate it.
+- Test plans now include explicit dependency-touched notes per test, real-dependency setup requirements, and a Justified Mocks section where every mock must name its boundary category.
+
+**Part C — Standards propagation to 9 previously-uninformed workflows:**
+
+| Workflow | Problem | Solution |
+|----------|---------|----------|
+| `verify-phase.md` | Anti-pattern scan caught stubs but not policy violations | New `scan_standards_compliance` step classifies each phase-modified file by domain (auth/DB/migration/error-path/frontend) and spot-checks against the relevant artifact; blocker findings force `gaps_found` |
+| `verify-work.md` | QA depth expansion had generic templates, ignored the project's own policies | New `load_project_standards` step loads all artifacts; each of the 9 QA categories now has a standards pointer annotation (Security → SECURITY.md, Accessibility → DESIGN-SYSTEM.md, etc.); frontmatter tracks `qa_standards_source: tailored\|default` |
+| `research-phase.md` | Researcher returned generic best-practice answers contradicting documented project policy | Standards artifacts added to researcher's `<files_to_read>`; new `<project_standards_constraint>` block requires alignment or explicit justification; RESEARCH.md must include a Standards Alignment section |
+| `ui-review.md` | Fallback was "abstract 6-pillar standards" when UI-SPEC.md absent, ignoring DESIGN-SYSTEM.md entirely | Formal audit-baseline hierarchy: UI-SPEC.md → DESIGN-SYSTEM.md → abstract. DESIGN-SYSTEM.md included in auditor context even when UI-SPEC.md is present, so audits catch design-system drift |
+| `audit-milestone.md` | No milestone-level standards drift detection — phases could individually pass while the milestone's cumulative code silently diverged | New section 5.6 "Standards Drift Detection" aggregates phase-level findings + cross-phase sampling; `standards` block added to audit YAML; violations force `gaps_found`, drift feeds tech debt |
+| `map-codebase.md` | Quality mapper's TESTING.md/CONVENTIONS.md documented observed patterns without comparing to prescriptive standards | Quality mapper now produces "Documented vs Observed" drift sections; Concerns mapper gets a top-level "Standards Violations" category as a first-class concern type (mocks of owned code, missing CSRF, missing migration guards, etc.) |
+| `list-phase-assumptions.md` | Surfaced assumptions across 5 areas but not "assumptions about standards compliance" — the most expensive misunderstanding to catch late | 6th assumption area added with per-artifact phase-specific prompts ("I'm assuming the new endpoint uses the JWT middleware pattern from SECURITY.md…") |
+| `plan-milestone-gaps.md` | Gap grouping ignored which standards artifact governed each gap | New section 2.5 tags each gap with its standards artifact; "same artifact tag → combine" grouping rule added; phase descriptions carry tags forward to `plan-phase` |
+
+All propagation edits are conditional on artifact existence — workflows remain functional on projects without generated standards, with explicit fallback guidance.
+
+**Core philosophy:** Tests that pass against mocks of owned code tell you nothing about production behavior. Standards documents that only planners read get silently violated everywhere else. Both problems have the same fix: enforce the rule at every point the rule could be broken, and make fallbacks explicit so the rule applies even when the authoritative document is missing.
+
+**Why it matters:** Standards drift is asymmetric — one phase's violation sets the precedent that the next phase's violation is "consistent with existing code." Catching drift at every lifecycle point (verify, UAT, research, audit, map, review, assumption-surface, gap-plan) keeps the project's documented posture honest. The no-mocks rule in particular eliminates a whole class of false-confidence bugs where CI passes, production breaks, and nobody can explain the disconnect.
+
+---
+
 ## Design Principles (Observed Patterns)
 
 These patterns emerged as we built the enhancements. They serve as guardrails for future changes:

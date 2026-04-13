@@ -1373,12 +1373,14 @@ Each item should include a "How to verify" note so the planner can generate acce
   - Transaction scoping — DDL in its own transaction, don't mix DDL and large data operations
 
 **3. `.planning/TESTING-STRATEGY.md`** — Testing philosophy and boundaries:
-- **Unit Tests** — Pure business logic, utilities, data transformations. No external dependencies. Fast, isolated, deterministic.
-- **Integration Tests** — Database queries (real DB, not mocks), API endpoint handlers, third-party service adapters. Use test containers or dedicated test databases.
-- **E2E Tests** — Critical user flows only (auth, checkout, core CRUD). Not exhaustive.
+- **Core Principle: Test Real Code, Not Mocks** — We are building production applications. A test that passes against a mock tells you nothing about whether the code works in production — it only tells you the mock matches the mock. **Do not mock anything you own or control.** Real databases, real internal services, real file systems, real queues, real HTTP handlers, real domain logic. The only acceptable mock boundary is **external third-party services you cannot run locally** (e.g., Stripe's production API, Twilio SMS delivery, a vendor SaaS endpoint) — and even there, prefer vendor-provided test modes, sandbox environments, or contract tests over hand-rolled mocks. If you find yourself reaching for a mock, stop and ask: *can I run the real thing in a container, test mode, or fixture instead?* The answer is almost always yes. Mocks are a smell, not a default — every mock in the codebase must be justified.
+- **Unit Tests** — Pure business logic, utilities, data transformations. No external dependencies because the code under test has none — not because dependencies were mocked away. Fast, isolated, deterministic.
+- **Integration Tests** — Database queries against a **real database** (test container or dedicated test DB, never mocks), API endpoint handlers exercised through the real HTTP stack, third-party adapters tested against sandbox/test-mode endpoints or recorded contract fixtures. If a test file imports a mocking library to stub out your own code, that is a bug in the test.
+- **E2E Tests** — Critical user flows only (auth, checkout, core CRUD) driven through the real running application stack. Not exhaustive, but uncompromisingly real.
+- **Acceptable Mock Boundaries (the short list)** — (1) External paid APIs with no sandbox (rare — most vendors provide test modes), (2) Time/clock for deterministic scheduling tests, (3) Random number generators for deterministic output tests. That's it. Everything else runs for real.
 - **What NOT to Test** — Framework boilerplate, simple getters/setters, generated code, third-party library internals
-- **Test Data** — Factories/fixtures over hardcoded values, realistic but deterministic, isolated per test
-- **Coverage Philosophy** — Cover behavior, not lines. 80% meaningful coverage beats 100% metric-chasing. Every bug fix gets a regression test.
+- **Test Data** — Factories/fixtures over hardcoded values, realistic but deterministic, isolated per test, seeded against the real database
+- **Coverage Philosophy** — Cover behavior, not lines. 80% meaningful coverage against real dependencies beats 100% coverage against mocks. Every bug fix gets a regression test that reproduces the bug against real infrastructure.
 
 **4. `.planning/ERROR-HANDLING.md`** — Error handling strategy:
 - **Error Classification** — Operational errors (expected, handle gracefully) vs programmer errors (unexpected, fail fast)
