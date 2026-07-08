@@ -42,14 +42,14 @@ Use AskUserQuestion with current values pre-selected:
 ```
 AskUserQuestion([
   {
-    question: "Which model profile for agents?",
+    question: "Which model profile for agents? (choose 'Other' and type 'inherit' to follow the session model)",
     header: "Model",
     multiSelect: false,
     options: [
-      { label: "Quality", description: "Opus everywhere except verification (highest cost)" },
       { label: "Balanced (Recommended)", description: "Opus for planning, Sonnet for research/execution/verification" },
-      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" },
-      { label: "Inherit", description: "Use current session model for all agents (best for OpenCode /model)" }
+      { label: "Max", description: "Fable 5 for planning/execution (planner, roadmapper, executor, debugger); Opus for research, Sonnet for verification. Highest capability." },
+      { label: "Quality", description: "Opus everywhere except verification (highest cost)" },
+      { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" }
     ]
   },
   {
@@ -146,7 +146,7 @@ Merge new settings into existing config.json:
 ```json
 {
   ...existing_config,
-  "model_profile": "quality" | "balanced" | "budget" | "inherit",
+  "model_profile": "quality" | "balanced" | "budget" | "max" | "inherit",
   "workflow": {
     "research": true/false,
     "plan_check": true/false,

@@ -7,21 +7,21 @@
  * would be faster, use fewer tokens, and be less error-prone).
  */
 const MODEL_PROFILES = {
-  'gsd-planner': { quality: 'opus', balanced: 'opus', budget: 'sonnet' },
-  'gsd-roadmapper': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-executor': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-phase-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-project-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-debugger': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet' },
-  'gsd-codebase-mapper': { quality: 'sonnet', balanced: 'haiku', budget: 'haiku' },
-  'gsd-verifier': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-plan-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-integration-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-nyquist-auditor': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
-  'gsd-ui-auditor': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku' },
+  'gsd-planner': { quality: 'opus', balanced: 'opus', budget: 'sonnet', max: 'fable' },
+  'gsd-roadmapper': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
+  'gsd-executor': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
+  'gsd-phase-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku', max: 'opus' },
+  'gsd-project-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku', max: 'opus' },
+  'gsd-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-debugger': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
+  'gsd-codebase-mapper': { quality: 'sonnet', balanced: 'haiku', budget: 'haiku', max: 'sonnet' },
+  'gsd-verifier': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-plan-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-integration-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-nyquist-auditor': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-ui-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku', max: 'opus' },
+  'gsd-ui-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
+  'gsd-ui-auditor': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
 };
 const VALID_PROFILES = Object.keys(MODEL_PROFILES['gsd-planner']);
 
