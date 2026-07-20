@@ -6,13 +6,13 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 
 | Agent | `quality` | `balanced` | `budget` | `max` | `inherit` |
 |-------|-----------|------------|----------|-------|-----------|
-| gsd-planner | opus | opus | sonnet | fable | inherit |
-| gsd-roadmapper | opus | sonnet | sonnet | fable | inherit |
+| gsd-planner | opus | opus | sonnet | opus | inherit |
+| gsd-roadmapper | opus | sonnet | sonnet | opus | inherit |
 | gsd-executor | opus | sonnet | sonnet | fable | inherit |
 | gsd-phase-researcher | opus | sonnet | haiku | opus | inherit |
 | gsd-project-researcher | opus | sonnet | haiku | opus | inherit |
 | gsd-research-synthesizer | sonnet | sonnet | haiku | sonnet | inherit |
-| gsd-debugger | opus | sonnet | sonnet | fable | inherit |
+| gsd-debugger | opus | sonnet | sonnet | opus | inherit |
 | gsd-codebase-mapper | sonnet | haiku | haiku | sonnet | inherit |
 | gsd-verifier | sonnet | sonnet | haiku | sonnet | inherit |
 | gsd-plan-checker | sonnet | sonnet | haiku | sonnet | inherit |
@@ -41,8 +41,9 @@ Model profiles control which Claude model each GSD agent uses. This allows balan
 - Use when: conserving quota, high-volume work, less critical phases
 
 **max** - Highest-capability models for the build loop
-- Fable 5 for the agents that plan and write code (planner, roadmapper, executor, debugger)
-- Opus for research/design agents, Sonnet for read-only verification
+- Fable 5 for execution only (gsd-executor)
+- Opus for planning, roadmapping, debugging, and research/design agents
+- Sonnet for read-only verification
 - Use when: you want the strongest possible outputs for planning and execution and quota is not a concern
 
 **inherit** - Follow the current session model

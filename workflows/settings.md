@@ -47,7 +47,7 @@ AskUserQuestion([
     multiSelect: false,
     options: [
       { label: "Balanced (Recommended)", description: "Opus for planning, Sonnet for research/execution/verification" },
-      { label: "Max", description: "Fable 5 for planning/execution (planner, roadmapper, executor, debugger); Opus for research, Sonnet for verification. Highest capability." },
+      { label: "Max", description: "Opus for planning/roadmapping/debugging/research, Fable 5 for execution only, Sonnet for verification. Highest capability." },
       { label: "Quality", description: "Opus everywhere except verification (highest cost)" },
       { label: "Budget", description: "Sonnet for writing, Haiku for research/verification (lowest cost)" }
     ]
