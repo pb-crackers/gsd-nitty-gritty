@@ -1,12 +1,28 @@
-# GSD Nitty Gritty
+<p align="center">
+  <img src="assets/logo.svg" alt="GSD Nitty Gritty" width="640">
+</p>
 
-### *Slow is smooth and smooth is fast.*
+<p align="center">
+  <em>The AI dev workflow that reads the code before it writes the code.</em>
+</p>
 
-A fork of [Get Shit Done (GSD)](https://github.com/gsd-build/get-shit-done) workflows for AI-assisted development, enhanced with opinionated engineering standards that prioritize **code quality, security, and maintainability** over raw output speed.
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.25.1-ff5e3a?style=flat-square" alt="version">
+  <img src="https://img.shields.io/badge/license-MIT-9aa4b8?style=flat-square" alt="license">
+  <img src="https://img.shields.io/badge/built%20on-GSD-e0245e?style=flat-square" alt="built on GSD">
+  <img src="https://img.shields.io/badge/rigor-%F0%9F%94%A5%20maximum-ff8a3d?style=flat-square" alt="rigor: maximum">
+  <img src="https://img.shields.io/badge/PRs-welcome-2ea043?style=flat-square" alt="PRs welcome">
+</p>
 
 ---
 
-## The Problem
+A fork of [Get Shit Done (GSD)](https://github.com/gsd-build/get-shit-done) workflows for AI-assisted development, enhanced with opinionated engineering standards that prioritize **code quality, security, and maintainability** over raw output speed.
+
+> **TL;DR** — AI can write a thousand lines in seconds. This makes it write the *right* fifty instead. 🐢💨
+
+---
+
+## 🕳️ The Problem
 
 AI-generated code is actually pretty good. But left unchecked, AI code generation has two failure modes:
 
@@ -14,7 +30,7 @@ AI-generated code is actually pretty good. But left unchecked, AI code generatio
 
 2. **Too little depth** — AI will happily scaffold an entire API in minutes, but skip input validation, write `SELECT *` queries, leave error handling as `catch (e) { throw e }`, and commit migrations that explode on re-run. The speed is impressive until production says hello.
 
-## The Solution
+## 🛠️ The Solution
 
 GSD Nitty Gritty adds three enforcement mechanisms to the standard GSD workflow:
 
@@ -106,7 +122,7 @@ For each phase, the verifier classifies what was built and appends targeted test
 
 ---
 
-## How It Integrates With GSD
+## 🔌 How It Integrates With GSD
 
 This is a drop-in enhancement to the standard GSD workflow. The same commands work the same way — `/gsd:new-project`, `/gsd:plan-phase`, `/gsd:execute-phase`, `/gsd:autonomous`, etc. The differences are in what happens *inside* those commands:
 
@@ -125,7 +141,7 @@ This is a drop-in enhancement to the standard GSD workflow. The same commands wo
 
 ---
 
-## Installation
+## 📦 Installation
 
 Replace the standard GSD workflows directory with this repo:
 
@@ -146,7 +162,7 @@ cp -r /tmp/gsd-nitty-gritty/workflows ~/.claude/get-shit-done/workflows
 
 ---
 
-## Philosophy
+## 🧭 Philosophy
 
 More steps up front. Fewer fires later.
 
@@ -158,12 +174,12 @@ GSD Nitty Gritty trades raw generation speed for engineering rigor. Every phase 
 
 ---
 
-## Credits
+## 🙏 Credits
 
 Built on top of [Get Shit Done (GSD)](https://github.com/gsd-build/get-shit-done) by the GSD team.
 
 ---
 
-## License
+## 📄 License
 
-MIT
+MIT — go get shit done.

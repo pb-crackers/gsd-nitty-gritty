@@ -1,0 +1,66 @@
+<svg width="840" height="260" viewBox="0 0 840 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GSD Nitty Gritty — slow is smooth and smooth is fast">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="840" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#12131a"/>
+      <stop offset="0.55" stop-color="#191a24"/>
+      <stop offset="1" stop-color="#20141a"/>
+    </linearGradient>
+    <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="0.5" stop-color="#ff5e3a"/>
+      <stop offset="1" stop-color="#e0245e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8ecf4"/>
+      <stop offset="1" stop-color="#9aa4b8"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- panel -->
+  <rect x="1" y="1" width="838" height="258" rx="22" fill="url(#bg)" stroke="#2c2e3c" stroke-width="2"/>
+
+  <!-- subtle grit dots -->
+  <g fill="#ffffff" opacity="0.05">
+    <circle cx="705" cy="52" r="2"/><circle cx="742" cy="86" r="1.6"/><circle cx="770" cy="60" r="2.4"/>
+    <circle cx="726" cy="120" r="1.4"/><circle cx="788" cy="104" r="1.8"/><circle cx="760" cy="140" r="1.4"/>
+    <circle cx="700" cy="150" r="1.6"/><circle cx="795" cy="150" r="1.4"/>
+  </g>
+
+  <!-- grindstone gear -->
+  <g transform="translate(120 130)">
+    <g filter="url(#soft)">
+      <g fill="url(#ember)">
+        <path d="M0 -70 L11 -66 L9 -50 L-9 -50 L-11 -66 Z"/>
+        <path d="M0 70 L11 66 L9 50 L-9 50 L-11 66 Z"/>
+        <path d="M-70 0 L-66 11 L-50 9 L-50 -9 L-66 -11 Z"/>
+        <path d="M70 0 L66 11 L50 9 L50 -9 L66 -11 Z"/>
+        <path d="M-49 -49 L-39 -55 L-31 -43 L-43 -31 L-55 -39 Z"/>
+        <path d="M49 49 L39 55 L31 43 L43 31 L55 39 Z"/>
+        <path d="M49 -49 L55 -39 L43 -31 L31 -43 L39 -55 Z"/>
+        <path d="M-49 49 L-55 39 L-43 31 L-31 43 L-39 55 Z"/>
+      </g>
+    </g>
+    <circle r="54" fill="#1c1d28" stroke="url(#ember)" stroke-width="5"/>
+    <circle r="30" fill="none" stroke="#3a3c4e" stroke-width="3"/>
+    <!-- turtle-ish steady mark: three ticks = slow & steady -->
+    <g stroke="url(#steel)" stroke-width="5" stroke-linecap="round">
+      <line x1="-14" y1="-6" x2="-14" y2="10"/>
+      <line x1="0" y1="-12" x2="0" y2="16"/>
+      <line x1="14" y1="-6" x2="14" y2="10"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <text x="212" y="112" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="76" font-weight="800" letter-spacing="2" fill="url(#steel)">GSD</text>
+  <text x="212" y="160" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="40" font-weight="800" letter-spacing="6" fill="url(#ember)">NITTY GRITTY</text>
+
+  <!-- divider -->
+  <rect x="214" y="178" width="470" height="2" rx="1" fill="#333546"/>
+
+  <!-- tagline -->
+  <text x="214" y="210" font-family="'Courier New', monospace" font-size="19" font-style="italic" letter-spacing="1" fill="#c8cdda">slow is smooth &#183; smooth is fast</text>
+</svg>
