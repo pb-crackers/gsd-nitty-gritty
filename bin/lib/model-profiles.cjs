@@ -7,13 +7,13 @@
  * would be faster, use fewer tokens, and be less error-prone).
  */
 const MODEL_PROFILES = {
-  'gsd-planner': { quality: 'opus', balanced: 'opus', budget: 'sonnet', max: 'fable' },
-  'gsd-roadmapper': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
+  'gsd-planner': { quality: 'opus', balanced: 'opus', budget: 'sonnet', max: 'opus' },
+  'gsd-roadmapper': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'opus' },
   'gsd-executor': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
   'gsd-phase-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku', max: 'opus' },
   'gsd-project-researcher': { quality: 'opus', balanced: 'sonnet', budget: 'haiku', max: 'opus' },
   'gsd-research-synthesizer': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
-  'gsd-debugger': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'fable' },
+  'gsd-debugger': { quality: 'opus', balanced: 'sonnet', budget: 'sonnet', max: 'opus' },
   'gsd-codebase-mapper': { quality: 'sonnet', balanced: 'haiku', budget: 'haiku', max: 'sonnet' },
   'gsd-verifier': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
   'gsd-plan-checker': { quality: 'sonnet', balanced: 'sonnet', budget: 'haiku', max: 'sonnet' },
