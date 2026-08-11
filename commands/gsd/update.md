@@ -23,7 +23,7 @@ Routes to the update workflow which handles:
 </execution_context>
 
 <process>
-**Follow the update workflow** from `@/Users/phillipdougherty/.claude/get-shit-done/workflows/update.md`.
+**Follow the update workflow** above.
 
 The workflow handles all logic including:
 1. Installed version detection (local/global)

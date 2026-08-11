@@ -33,7 +33,7 @@ State is resolved in-workflow via `init todos` and targeted reads.
 </context>
 
 <process>
-**Follow the add-todo workflow** from `@/Users/phillipdougherty/.claude/get-shit-done/workflows/add-todo.md`.
+**Follow the add-todo workflow** above.
 
 The workflow handles all logic including:
 1. Directory ensuring

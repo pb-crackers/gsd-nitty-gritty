@@ -29,6 +29,6 @@ $ARGUMENTS
 </context>
 
 <process>
-Execute the note workflow from @/Users/phillipdougherty/.claude/get-shit-done/workflows/note.md end-to-end.
+Execute the note workflow above, end-to-end.
 Capture the note, list notes, or promote to todo — depending on arguments.
 </process>

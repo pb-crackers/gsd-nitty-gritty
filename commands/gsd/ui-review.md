@@ -27,6 +27,6 @@ Phase: $ARGUMENTS — optional, defaults to last completed phase.
 </context>
 
 <process>
-Execute @/Users/phillipdougherty/.claude/get-shit-done/workflows/ui-review.md end-to-end.
+Execute the workflow above, end-to-end.
 Preserve all workflow gates.
 </process>

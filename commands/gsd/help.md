@@ -17,6 +17,6 @@ Output ONLY the reference content below. Do NOT add:
 </execution_context>
 
 <process>
-Output the complete GSD command reference from @/Users/phillipdougherty/.claude/get-shit-done/workflows/help.md.
+Output the complete GSD command reference above.
 Display the reference content directly — no additions or modifications.
 </process>

@@ -26,7 +26,7 @@ Routes to the resume-project workflow which handles:
 </execution_context>
 
 <process>
-**Follow the resume-project workflow** from `@/Users/phillipdougherty/.claude/get-shit-done/workflows/resume-project.md`.
+**Follow the resume-project workflow** above.
 
 The workflow handles all resumption logic including:
 

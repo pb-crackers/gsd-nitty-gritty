@@ -40,6 +40,6 @@ Normalize phase input in step 2 before any directory lookups.
 </context>
 
 <process>
-Execute the plan-phase workflow from @/Users/phillipdougherty/.claude/get-shit-done/workflows/plan-phase.md end-to-end.
+Execute the plan-phase workflow above, end-to-end.
 Preserve all workflow gates (validation, research, planning, verification loop, routing).
 </process>

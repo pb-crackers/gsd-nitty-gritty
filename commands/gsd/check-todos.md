@@ -31,7 +31,7 @@ Todo state and roadmap correlation are loaded in-workflow using `init todos` and
 </context>
 
 <process>
-**Follow the check-todos workflow** from `@/Users/phillipdougherty/.claude/get-shit-done/workflows/check-todos.md`.
+**Follow the check-todos workflow** above.
 
 The workflow handles all logic including:
 1. Todo existence checking

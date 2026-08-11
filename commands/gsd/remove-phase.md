@@ -26,6 +26,6 @@ Roadmap and state are resolved in-workflow via `init phase-op` and targeted read
 </context>
 
 <process>
-Execute the remove-phase workflow from @/Users/phillipdougherty/.claude/get-shit-done/workflows/remove-phase.md end-to-end.
+Execute the remove-phase workflow above, end-to-end.
 Preserve all validation gates (future phase check, work check), renumbering logic, and commit.
 </process>

@@ -25,6 +25,6 @@ $ARGUMENTS
 </context>
 
 <process>
-Execute the do workflow from @/Users/phillipdougherty/.claude/get-shit-done/workflows/do.md end-to-end.
+Execute the do workflow above, end-to-end.
 Route user intent to the best GSD command and invoke it.
 </process>

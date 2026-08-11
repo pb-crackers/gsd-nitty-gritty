@@ -13,6 +13,6 @@ Use when `.planning/phases/` has accumulated directories from past milestones.
 </execution_context>
 
 <process>
-Follow the cleanup workflow at @/Users/phillipdougherty/.claude/get-shit-done/workflows/cleanup.md.
+Follow the cleanup workflow above.
 Identify completed milestones, show a dry-run summary, and archive on confirmation.
 </process>

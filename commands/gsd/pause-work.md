@@ -27,7 +27,7 @@ State and phase progress are gathered in-workflow with targeted reads.
 </context>
 
 <process>
-**Follow the pause-work workflow** from `@/Users/phillipdougherty/.claude/get-shit-done/workflows/pause-work.md`.
+**Follow the pause-work workflow** above.
 
 The workflow handles all logic including:
 1. Phase directory detection
