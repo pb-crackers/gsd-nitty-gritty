@@ -23,17 +23,30 @@ const repoRoot = path.join(__dirname, '..', '..');
 // Rough but stable: bytes/4. Consistent across runs, which is all a delta needs.
 const tokens = (bytes) => Math.round(bytes / 4);
 
+/**
+ * Two figures, because 29 of 38 command files reference their workflow with @
+ * twice — once in <execution_context> and once in the prose line "Execute the X
+ * workflow from @path". Whether the harness expands both or collapses them is
+ * not observable from here, so report both bounds rather than pick one:
+ *
+ *   bytes    — every @ reference expanded (upper bound)
+ *   uniqueBytes — each distinct file counted once (lower bound)
+ */
 function loadFor(commandFile) {
   const text = fs.readFileSync(commandFile, 'utf-8');
-  let bytes = Buffer.byteLength(text);
-  const includes = [];
+  const base = Buffer.byteLength(text);
+  let bytes = base;
+  let uniqueBytes = base;
+  const seen = new Set();
+  const dupes = [];
   for (const match of text.matchAll(/@(\/\S+\.md)/g)) {
-    try {
-      bytes += fs.statSync(match[1]).size;
-      includes.push(path.basename(match[1]));
-    } catch { /* include points somewhere this machine does not have */ }
+    let size;
+    try { size = fs.statSync(match[1]).size; } catch { continue; }
+    bytes += size;
+    if (seen.has(match[1])) dupes.push(path.basename(match[1]));
+    else { seen.add(match[1]); uniqueBytes += size; }
   }
-  return { bytes, includes };
+  return { bytes, uniqueBytes, dupes };
 }
 
 function corpus() {
@@ -55,10 +68,19 @@ const rows = fs.readdirSync(commandsDir)
 
 const { files, bytes } = corpus();
 process.stdout.write(`workflows/: ${files} files, ${bytes} bytes, ~${tokens(bytes)} tok\n\n`);
-process.stdout.write('Instruction load per command (command file + @-included files):\n\n');
+process.stdout.write('Instruction load per command — all @ refs expanded / deduplicated:\n\n');
 for (const row of rows) {
-  process.stdout.write(`  ${String(tokens(row.bytes)).padStart(6)} tok  /gsd:${row.name}\n`);
+  const dupe = row.dupes.length ? `  (dup: ${row.dupes.join(', ')})` : '';
+  process.stdout.write(
+    `  ${String(tokens(row.bytes)).padStart(6)} / ${String(tokens(row.uniqueBytes)).padStart(6)} tok  /gsd:${row.name}${dupe}\n`
+  );
 }
-const sorted = rows.map(r => r.bytes).sort((a, b) => a - b);
-process.stdout.write(`\n  median: ${tokens(sorted[Math.floor(sorted.length / 2)])} tok`);
-process.stdout.write(`   total: ${tokens(rows.reduce((s, r) => s + r.bytes, 0))} tok\n`);
+const med = (key) => {
+  const sorted = rows.map(r => r[key]).sort((a, b) => a - b);
+  return tokens(sorted[Math.floor(sorted.length / 2)]);
+};
+const sum = (key) => tokens(rows.reduce((s, r) => s + r[key], 0));
+process.stdout.write(`\n  median: ${med('bytes')} / ${med('uniqueBytes')} tok`);
+process.stdout.write(`   total: ${sum('bytes')} / ${sum('uniqueBytes')} tok\n`);
+const dup = rows.filter(r => r.dupes.length).length;
+process.stdout.write(`  ${dup} of ${rows.length} commands reference a file with @ more than once\n`);

@@ -15,20 +15,33 @@ The number that matters is not the size of `workflows/` (565 KB ≈ 141k tokens 
 files). It is what a single command drags into the context window before doing any work. A
 command file `@`-includes its workflow and templates, so the whole thing lands up front.
 
-| Command | Instruction load before step 1 |
-|---|---|
-| `/gsd:new-project` | **37,613 tok** |
-| `/gsd:new-milestone` | 19,447 tok |
-| `/gsd:plan-phase` | 18,381 tok |
-| `/gsd:verify-work` | 17,981 tok |
-| `/gsd:autonomous` | 16,717 tok |
-| `/gsd:discuss-phase` | 14,808 tok |
-| `/gsd:quick` | 12,675 tok |
-| `/gsd:execute-phase` | 10,528 tok |
-| *median across all 38 commands* | *4,614 tok* |
+**These figures were an over-count and are corrected below.** 29 of 38 command files
+reference their workflow with `@` twice — once in `<execution_context>` and once in the prose
+line "Execute the X workflow from @path" — and the original script expanded both. Whether the
+harness expands both or collapses them is not observable from here, so the table now gives
+both bounds. The lower one is the safe number to plan against.
 
-`/gsd:new-project` spends roughly a fifth of a 200k window on instructions for itself. That
-is the budget the actual project research, roadmap and questions have to share.
+| Command | Both `@` refs expanded | Deduplicated |
+|---|---|---|
+| `/gsd:new-project` | 37,613 tok | **~22,600 tok** |
+| `/gsd:new-milestone` | 19,447 tok | ~12,700 tok |
+| `/gsd:plan-phase` | 18,381 tok | ~9,980 tok |
+| `/gsd:verify-work` | 17,981 tok | ~9,965 tok |
+| `/gsd:autonomous` | 16,717 tok | ~9,130 tok |
+| `/gsd:discuss-phase` | 14,808 tok | 14,808 tok *(no dup)* |
+| `/gsd:quick` | 12,675 tok | ~6,600 tok |
+| `/gsd:execute-phase` | 10,528 tok | ~6,000 tok |
+| *median across 38 commands* | *4,614 tok* | *~2,575 tok* |
+
+Even on the dedup reading, `/gsd:new-project` costs ~22.6k tokens before step 1 and the
+conclusions below are unchanged — but the corpus is smaller than this audit first claimed and
+the savings should be judged against the right-hand column.
+
+**The duplicate `@` is worth fixing on its own.** If the harness does expand both, it is the
+single largest waste in the system — larger than everything else in this audit combined. The
+fix is one character per command file: drop the `@` from the prose reference. The obstacle is
+that `commands/gsd/` is not in this repo and the installer wipes and replaces it, so the fix
+has to go upstream to be durable.
 
 ### Composition
 
