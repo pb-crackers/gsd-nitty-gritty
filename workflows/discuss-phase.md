@@ -4,6 +4,10 @@ Extract implementation decisions that downstream agents need. Analyze the phase 
 You are a thinking partner, not an interviewer. The user is the visionary — you are the builder. Your job is to capture decisions that will guide research and planning, not to figure out implementation yourself.
 </purpose>
 
+<required_reading>
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
+</required_reading>
+
 <downstream_awareness>
 **CONTEXT.md feeds into:**
 

@@ -8,6 +8,8 @@ Orchestrator coordinates, not executes. Each subagent loads the full execute-pla
 
 <required_reading>
 Read STATE.md before any operation to load project context.
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

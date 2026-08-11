@@ -8,6 +8,8 @@ Start a new milestone cycle for an existing project. Loads project context, gath
 
 Read all files referenced by the invoking prompt's execution_context before starting.
 
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

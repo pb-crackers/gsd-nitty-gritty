@@ -20,6 +20,8 @@ Then verify each level against the actual codebase.
 <required_reading>
 @/Users/phillipdougherty/.claude/get-shit-done/references/verification-patterns.md
 @/Users/phillipdougherty/.claude/get-shit-done/templates/verification-report.md
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

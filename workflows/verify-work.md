@@ -4,6 +4,10 @@ Validate built features through conversational testing with persistent state. Cr
 User tests, Claude records. One test at a time. Plain text responses.
 </purpose>
 
+<required_reading>
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
+</required_reading>
+
 <philosophy>
 **Show expected, ask if reality matches.**
 

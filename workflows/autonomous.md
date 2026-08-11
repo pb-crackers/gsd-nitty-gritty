@@ -8,6 +8,8 @@ Drive all remaining milestone phases autonomously. For each incomplete phase: di
 
 Read all files referenced by the invoking prompt's execution_context before starting.
 
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

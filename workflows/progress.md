@@ -4,6 +4,8 @@ Check project progress, summarize recent work and what's ahead, then intelligent
 
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

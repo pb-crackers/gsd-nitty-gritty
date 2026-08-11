@@ -4,6 +4,8 @@ Verify milestone achieved its definition of done by aggregating phase verificati
 
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>

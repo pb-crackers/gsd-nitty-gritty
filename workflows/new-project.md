@@ -4,6 +4,8 @@ Initialize a new project through unified flow: questioning, research (optional),
 
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <auto_mode>

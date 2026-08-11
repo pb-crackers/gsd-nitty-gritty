@@ -12,6 +12,8 @@ Flags are composable: `--discuss --research --full` gives discussion + research 
 
 <required_reading>
 Read all files referenced by the invoking prompt's execution_context before starting.
+
+@/Users/phillipdougherty/.claude/get-shit-done/references/communication.md
 </required_reading>
 
 <process>
