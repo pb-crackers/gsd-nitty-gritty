@@ -9,7 +9,7 @@ const { test, gsd, read, write, assert, assertEqual, assertIncludes, assertNotIn
 const { project, defaultFrontmatter } = require('./fixtures.cjs');
 
 const PROSE_STATUS = 'All six plans executed, the blocking checkpoint APPROVED, MEDIA-01…06 all ticked';
-const VALID_STATUSES = ['planning', 'discussing', 'executing', 'verifying', 'paused', 'completed', 'unknown'];
+const VALID_STATUSES = ['planning', 'discussing', 'executing', 'verifying', 'awaiting_verdict', 'paused', 'completed', 'unknown'];
 
 test('state: prose Status never lands in the frontmatter enum', () => {
   const dir = project({ state: { status: PROSE_STATUS } });
@@ -189,4 +189,21 @@ test('init: all_phases_complete follows the roadmap, not "has any summary"', () 
 
   assertEqual(res.json.completed_phases, 0, 'one summary in a six-plan phase is not a complete phase');
   assertEqual(res.json.all_phases_complete, false, 'must not declare a milestone done mid-phase');
+});
+
+test('state: "awaiting a human verdict" is its own state, not verifying', () => {
+  const dir = project({ state: { status: 'AWAITING the reel-04 human verdict at the blocking checkpoint' } });
+  gsd(dir, ['state', 'update-progress']);
+
+  assertEqual(gsd(dir, ['state', 'json']).json.status, 'awaiting_verdict', 'blocked on a human is not verifying');
+});
+
+test('state: a hand-written awaiting_verdict survives', () => {
+  const dir = project({ state: { status: PROSE_STATUS } });
+  const text = read(dir, '.planning/STATE.md');
+  write(dir, '.planning/STATE.md', text.replace(/^status: .*/m, 'status: awaiting_verdict'));
+
+  gsd(dir, ['state', 'record-session', '--stopped-at', 'held']);
+
+  assertEqual(gsd(dir, ['state', 'json']).json.status, 'awaiting_verdict', 'must not be normalized away');
 });

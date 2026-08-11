@@ -655,7 +655,11 @@ function cmdStateSnapshot(cwd, raw) {
 // ─── State Frontmatter Sync ──────────────────────────────────────────────────
 
 /** The only values `status:` may ever hold. */
-const STATE_STATUSES = ['planning', 'discussing', 'executing', 'verifying', 'paused', 'completed', 'unknown'];
+// `awaiting_verdict` is distinct from `verifying`: the work is done and correct
+// so far as the tools can tell, and it is blocked on a human's judgement at a
+// checkpoint. Projects were writing that value by hand because the enum could
+// not express it, and it was then normalized away to something untrue.
+const STATE_STATUSES = ['planning', 'discussing', 'executing', 'verifying', 'awaiting_verdict', 'paused', 'completed', 'unknown'];
 
 /**
  * Map a human-written Status line onto the enum, or return null when it does
@@ -674,6 +678,10 @@ function normalizeStatusValue(status, pausedAt) {
   if (text.includes('executing') || text.includes('in progress')) return 'executing';
   if (text.includes('planning') || text.includes('ready to plan')) return 'planning';
   if (text.includes('discussing')) return 'discussing';
+  if (text.includes('awaiting_verdict') || text.includes('awaiting verdict')) return 'awaiting_verdict';
+  if (text.includes('awaiting') && (text.includes('verdict') || text.includes('checkpoint') || text.includes('approval'))) {
+    return 'awaiting_verdict';
+  }
   if (text.includes('verif')) return 'verifying';
   if (text.includes('complete') || text.includes('done')) return 'completed';
   if (text.includes('ready to execute')) return 'executing';
