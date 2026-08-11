@@ -69,7 +69,7 @@ Measured, all of it removable with no behaviour change:
 |---|---|
 | ~~Tool path written out in full, 147×~~ — **not recoverable, see below** | ~~2,300 tok~~ |
 | Repeated named steps (`offer_next`, `initialize`, `init_context`, `git_commit`, `update_state`…) | ~5,600 tok |
-| Box-drawing banner art, 77 lines | ~2,100 tok |
+| ~~Box-drawing banner art, 77 lines~~ — **kept by decision** | ~~2,100 tok~~ |
 | `if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi` — 52 occurrences in 26 files | ~600 tok |
 
 The `@file:` line is worth calling out: it is boilerplate in every workflow that exists only
@@ -83,8 +83,12 @@ blocks use the path twice or more, worth ~91 tokens total. The 147 repetitions a
 of the tool not being on `PATH`, and the only real fix is an installed shim — a change to
 the installer, not to the workflows. **Dropped from the plan.**
 
-**Recommendation (revised).** Replace banner art with a sentence; extract the
-genuinely-identical steps into `references/` and `@`-include them. Leave the path alone.
+**Banner art stays, by decision.** The `━━━` run separators and the `├──` file trees are
+not the same thing, and neither is worth removing: a file tree genuinely reads better as art
+than as prose, and the run banners cost little and make a long autonomous session scannable.
+
+**Recommendation (revised).** Extract the genuinely-identical steps into `references/` and
+`@`-include them. Leave the path and the box-drawing alone.
 The `@file:` boilerplate is ~600 tokens and is a symptom of `output()` spilling over the
 50 KB Bash buffer — worth fixing in `core.cjs` on its own merits, not for the token count.
 
@@ -203,7 +207,7 @@ have proven nothing broke.
 | # | Change | Risk | Est. saving |
 |---|---|---|---|
 | 1 | ~~`GSD=` variable~~ — dropped, shell state does not persist between calls | — | ~~3k~~ |
-| 2 | Delete banner art, replace with sentences | none | ~2k |
+| 2 | ~~Delete banner art~~ — dropped by decision, see below | — | ~~2k~~ |
 | 3 | Extract identical repeated steps to `references/` | low | ~5k |
 | 4 | `references/communication.md` + delete scattered presentation rules | low | ~4k |
 | 5 | Remove the engineering-depth gate on plain-English treatment | low | — |
@@ -211,7 +215,7 @@ have proven nothing broke.
 | 7 | Command files stop restating workflow procedure | low | ~2k |
 | 8 | Example cull, one per idea, five largest files first | **medium** | ~10–14k |
 
-Total *estimate*: **25–29k tokens**, roughly 18–21% of the corpus, concentrated in the
+Total *estimate*: **23–27k tokens**, roughly 16–19% of the corpus, concentrated in the
 commands that cost the most today. `/gsd:new-project` should land near 26–28k.
 
 Step 8 is medium risk because judging which example carries a format contract and which is

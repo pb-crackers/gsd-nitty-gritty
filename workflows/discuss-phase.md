@@ -140,12 +140,22 @@ Exit workflow.
 
 **If `phase_found` is true:** Continue to check_existing.
 
-**Auto mode** — If `--auto` is present in ARGUMENTS:
-- In `check_existing`: auto-select "Skip" (if context exists) or continue without prompting (if no context/plans)
-- In `present_gray_areas`: auto-select ALL gray areas without asking the user
-- In `discuss_areas`: for each discussion question, choose the recommended option (first option, or the one marked "recommended") without using AskUserQuestion
-- Log each auto-selected choice inline so the user can review decisions in the context file
-- After discussion completes, auto-advance to plan-phase (existing behavior)
+**Auto mode — the rule for the whole workflow.** If `--auto` is in ARGUMENTS, never call
+AskUserQuestion. At every decision take the recommended option — the one you would have
+marked "recommended", otherwise the first — and log it inline so the user can audit the run
+afterwards:
+
+```
+[auto] [where] — [what was decided] (recommended default)
+```
+
+Three decisions are not "pick the first option" and are settled here:
+- **Context already exists** → keep it and move on to auto_advance. Do not re-run the
+  discussion and do not exit; the chain has to reach planning.
+- **Plans already exist** → continue and capture context anyway, replanning afterwards.
+- **Gray area selection** → take all of them.
+
+Then auto-advance to plan-phase. Individual steps below do not restate any of this.
 </step>
 
 <step name="check_existing">
@@ -155,11 +165,7 @@ Check if CONTEXT.md already exists using `has_context` from init.
 ls ${phase_dir}/*-CONTEXT.md 2>/dev/null
 ```
 
-**If exists:**
-
-**If `--auto`:** Auto-select "Update it" — load existing context and continue to analyze_phase. Log: `[auto] Context exists — updating with auto-selected decisions.`
-
-**Otherwise:** Use AskUserQuestion:
+**If exists:** Use AskUserQuestion:
 - header: "Context"
 - question: "Phase [X] already has context. What do you want to do?"
 - options:
@@ -173,11 +179,7 @@ If "Skip": Exit workflow
 
 **If doesn't exist:**
 
-Check `has_plans` and `plan_count` from init. **If `has_plans` is true:**
-
-**If `--auto`:** Auto-select "Continue and replan after". Log: `[auto] Plans exist — continuing with context capture, will replan after.`
-
-**Otherwise:** Use AskUserQuestion:
+Check `has_plans` and `plan_count` from init. **If `has_plans` is true:** Use AskUserQuestion:
 - header: "Plans exist"
 - question: "Phase [X] already has {plan_count} plan(s) created without user context. Your decisions here won't affect existing plans unless you replan."
 - options:
@@ -436,9 +438,7 @@ We'll clarify HOW to implement this.
 - [Decision from Phase M that applies here]
 ```
 
-**If `--auto`:** Auto-select ALL gray areas. Log: `[auto] Selected all gray areas: [list area names].` Skip the AskUserQuestion below and continue directly to discuss_areas with all areas selected.
-
-**Otherwise, use AskUserQuestion (multiSelect: true):**
+**Use AskUserQuestion (multiSelect: true):**
 - header: "Discuss"
 - question: "Which areas do you want to discuss for [phase name]?"
 - options: Generate 3-4 phase-specific gray areas, each with:
@@ -513,14 +513,6 @@ For each selected area, conduct a focused discussion loop.
 - `--batch` mode: 1 grouped turn with 2-5 numbered questions, then check whether to continue
 
 Each answer (or answer set, in batch mode) should reveal the next question or next batch.
-
-**Auto mode (`--auto`):** For each area, Claude selects the recommended option (first option, or the one explicitly marked "recommended") for every question without using AskUserQuestion. Log each auto-selected choice:
-```
-[auto] [Area] — Q: "[question text]" → Selected: "[chosen option]" (recommended default)
-```
-After all areas are auto-resolved, skip the "Explore more gray areas" prompt and proceed directly to write_context.
-
-**Interactive mode (no `--auto`):**
 
 **For each area:**
 
