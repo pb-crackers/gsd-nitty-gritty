@@ -332,34 +332,13 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
    - Note applicable prior decisions for use in presentation
 
-3. **Phase engineering depth classification (CRITICAL)** — Determine the engineering depth of this phase. This decides whether you apply first-principles decomposition or stick to visual/UX decisions.
+3. **Decide which topics this phase actually raises.** A phase touching data, APIs, auth, integrations, background work, or performance raises the engineering concerns below. A phase that only restyles existing UI does not — for that, look for ambiguity in layout, density, interaction, empty states and copy. Plenty of phases are both.
 
-   **Pure visual/UX phase (skip engineering decomposition):**
-   - Extending or restyling an existing UI component
-   - Adding visual variants, layout tweaks, copy changes
-   - No new data, APIs, logic, state, or integrations
-   - No database or backend changes
+   This picks the *topics*. It does not change *how you talk about them* — the communication standard applies to every decision either way.
 
-   **Engineering depth phase (apply first-principles decomposition):**
-   - New API endpoints or changes to existing endpoints
-   - New database tables, schema changes, or migrations
-   - New backend logic, services, or business rules
-   - Refactoring existing code
-   - New integrations (third-party APIs, external services)
-   - Authentication, authorization, or security-sensitive work
-   - Data transformations, batch processing, or background jobs
-   - State management changes that affect multiple components or data sources
-   - Performance-sensitive work (caching, indexing, query optimization)
+4. **Gray area generation.** For each concern this phase actually raises, find the decision points with real trade-offs that deserve the user's input, and annotate with code context where the scout found it ("you already have a Card component"; "no existing pattern for this"). Ignore concerns that genuinely don't apply.
 
-   **Mixed phase:** Some phases have both visual and engineering depth (e.g., "build notification UI with backend delivery system"). Apply BOTH the visual gray area logic AND the engineering decomposition.
-
-4. **Gray area generation:**
-
-   **If pure visual/UX phase:** For each relevant category (UI, UX, Behavior, Empty States, Content), identify 1-2 specific ambiguities that would change implementation. **Annotate with code context where relevant** (e.g., "You already have a Card component" or "No existing pattern for this"). Skip the engineering concerns checklist below.
-
-   **If engineering depth phase (or mixed):** Walk through the engineering concerns checklist below. For each concern relevant to this phase, identify decision points that have real trade-offs and deserve user input. You are thinking like an engineer would when estimating: "What decisions here would change the result or cost? What do I need the user's input on?"
-
-   **Engineering concerns checklist (apply only relevant ones — skip concerns that genuinely don't apply):**
+   **Engineering concerns:**
 
    1. **Refactor Opportunities (ALWAYS CHECK FIRST)** — From codebase_context, is there existing code that could be extended or refactored to accomplish this phase's work? If yes, surface it as a gray area:
       - "We could extend `EmailService` to handle these notifications OR create a new `NotificationService`. Which approach?"
@@ -405,32 +384,7 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
       - Client vs server authority?
       - Optimistic updates or server-confirmed?
 
-5. **For each engineering gray area, prepare a trade-off analysis:**
-
-   When an engineering decision has multiple viable options, don't just list them — think through the consequences. For each option, identify:
-   - **Concrete pros** — specific advantages in this project's context
-   - **Concrete cons** — specific disadvantages, risks, or future costs
-   - **What it affects downstream** — other code, future phases, maintainability, performance
-   - **Your recommendation** — which option you'd pick and WHY, based on project state, existing code, and scale expectations
-
-   **Example trade-off analysis for a data model decision:**
-   ```
-   Decision: How to store user notifications?
-
-   Option A: New `notifications` table
-   - ✓ Pros: Clean schema, indexable, easy to query independently, supports future notification types
-   - ✗ Cons: Requires migration, adds a join when fetching user + notifications
-   - Affects: New API endpoint likely, notification fan-out logic, read/unread tracking
-
-   Option B: JSONB field on users table
-   - ✓ Pros: No migration, simpler initial implementation, colocated with user data
-   - ✗ Cons: Harder to query efficiently, can't index notification fields, JSONB grows unbounded per user
-   - Affects: User table size, query patterns, future migration pain if you switch later
-
-   Recommendation: Option A — you'll likely need to query notifications independently (unread counts, filtering by type), and the JSONB approach becomes painful as the feature grows. The migration cost is one-time; the query pain would be ongoing.
-   ```
-
-   The user makes the final call, but you've done the thinking so they can choose with full context.
+5. **For every gray area, work out the trade-off before you present it.** Know what each option costs, what it affects downstream, and which one you'd pick. Present it per the communication standard — plain language, your recommendation, depth on request. This applies to visual decisions as much as engineering ones.
 
 6. **Skip assessment** — If no meaningful gray areas exist (pure infrastructure, clear-cut implementation, or all already decided in prior phases), the phase may not need discussion.
 
@@ -508,49 +462,9 @@ We'll clarify HOW to implement this.
   (You chose infinite scroll in Phase 4. useInfiniteQuery hook already set up.)
 ```
 
-**For engineering depth gray areas: present trade-offs BEFORE the multiselect.**
+**Say what each area is actually about before the multiselect.** A bare list of labels makes the user guess what they are choosing between. Give each one a sentence or two of plain-language framing — what the decision is and why it matters — per the communication standard. Where you already have a view, say so.
 
-When the phase has engineering depth and you generated trade-off analyses in `analyze_phase`, display the trade-offs inline so the user sees the engineering thinking, not just option labels. Format:
-
-```
-## Engineering Decisions
-
-Before we pick which areas to dig into, here's the engineering thinking I've done:
-
-### 1. [Decision area name]
-
-**Context:** [what's being decided and why it matters]
-
-**Option A: [name]**
-- ✓ [concrete pro]
-- ✓ [concrete pro]
-- ✗ [concrete con]
-- **Affects:** [downstream impact]
-
-**Option B: [name]**
-- ✓ [concrete pro]
-- ✗ [concrete con]
-- ✗ [concrete con]
-- **Affects:** [downstream impact]
-
-**My recommendation:** [A or B] — [rationale grounded in this project's state, existing code, and scale expectations]
-
----
-
-### 2. [Next decision area]
-
-[Same format]
-```
-
-Present ALL engineering trade-offs up front so the user sees the full picture. THEN use AskUserQuestion to let them pick which areas to discuss further OR accept your recommendations as-is.
-
-**AskUserQuestion for engineering phases:**
-- header: "Discuss"
-- question: "Which engineering decisions do you want to discuss, or accept the recommendations as-is?"
-- options: Include an "Accept all recommendations" option FIRST, then each decision area, then specific cross-cutting topics
-- multiSelect: true
-
-**Why the trade-off-first approach:** The user is not a multiple-choice test taker — they're a product owner who needs to understand the consequences. Showing them "Option A vs Option B" without context forces them to either trust you blindly or ask "what's the difference?". Showing them pros/cons/recommendations up front lets them validate your reasoning, push back if they disagree, or defer to you if the decision is too technical to care about.
+Keep it short. This is the menu, not the meal: enough for the user to choose what's worth their time, with the detail waiting behind whatever they pick. If you have a recommendation for every area, offer "Accept all recommendations" as the first option so they can move on without a tour.
 
 **Do NOT include a "skip" or "you decide" option in the overall gray area selection.** User ran this command to discuss — give them real choices. HOWEVER, "Accept all recommendations" is valid because it means "I trust your engineering reasoning, let's move on."
 
@@ -613,30 +527,9 @@ After all areas are auto-resolved, skip the "Explore more gray areas" prompt and
    Let's talk about [Area].
    ```
 
-1b. **For engineering decisions: walk through consequences, not just options.**
+1b. **Open with your thinking, then invite disagreement.** State the decision and where you land on it in plain language, then ask whether that reasoning holds or you're missing a constraint. A conversation, not a quiz — and when the user disagrees, find out why before moving on. Their objection usually carries context you didn't have.
 
-   If this area is an engineering decision (from the engineering concerns checklist in analyze_phase), start by re-stating the trade-off analysis and then ask the user to respond to your thinking, not just pick from a list. Format:
-
-   ```
-   Here's my thinking on [decision]:
-
-   [Brief restatement of the trade-off — pros, cons, recommendation]
-
-   My gut says [recommendation] because [rationale tied to existing code/project state/scale].
-
-   Does that reasoning hold for you, or are there constraints I'm missing?
-   ```
-
-   This is a conversation, not a quiz. Invite the user to push back on your reasoning, add context you don't have, or point out constraints that change the calculus. If they agree, capture the decision and move on. If they disagree, explore why — their disagreement often reveals context you didn't have access to.
-
-   **Probe for consequences when the user picks an option:**
-   - "If we go with Option A, we'll need to handle [downstream implication] — are you okay with that cost?"
-   - "That approach means we can't [future capability] without rework — is that a concern?"
-   - "This choice couples [X] to [Y] — is that acceptable?"
-
-   **Probe for refactor opportunities:**
-   - "Before we write new code for this, I noticed [existing file/class] does something similar. Want me to extend that instead?"
-   - "There are two existing utilities that overlap here — should we consolidate them as part of this work, or leave them alone?"
+   Probe the consequence of whatever they pick: what it costs downstream, what it makes hard later, what it couples together. And before any decision to write new code, say what already exists that could be extended instead.
 
 2. **Ask questions using the selected pacing:**
 
@@ -756,7 +649,7 @@ mkdir -p ".planning/phases/${padded_phase}-${phase_slug}"
 <engineering_decisions>
 ## Engineering Decisions & Rationale
 
-**Only include this section if the phase had engineering depth.** For each engineering decision, capture not just the choice but the reasoning — future phases and downstream agents need to understand WHY a decision was made, not just what it was.
+**Only include this section if the phase raised engineering concerns.** For each engineering decision, capture not just the choice but the reasoning — future phases and downstream agents need to understand WHY a decision was made, not just what it was.
 
 ### [Engineering concern — e.g., Data Model]
 **Decision:** [Chosen option]
