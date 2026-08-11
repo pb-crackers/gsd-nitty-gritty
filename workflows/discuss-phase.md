@@ -332,7 +332,9 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
    - These are **pre-answered** — don't re-ask unless this phase has conflicting needs
    - Note applicable prior decisions for use in presentation
 
-3. **Decide which topics this phase actually raises.** A phase touching data, APIs, auth, integrations, background work, or performance raises the engineering concerns below. A phase that only restyles existing UI does not — for that, look for ambiguity in layout, density, interaction, empty states and copy. Plenty of phases are both.
+3. **Decide which topics this phase actually raises.** Walk the engineering concerns checklist in step 4 and mark which ones this phase genuinely touches — that list IS the trigger list, so read it rather than guessing from the phase title. A phase that only restyles existing UI will touch none of them; for that one, look for ambiguity in layout, density, interaction, empty states and copy. Plenty of phases are both.
+
+   Concern 1 gets checked on every phase, including visual ones. "Is there existing code that should be extended instead of adding new?" is always a live question.
 
    This picks the *topics*. It does not change *how you talk about them* — the communication standard applies to every decision either way.
 
