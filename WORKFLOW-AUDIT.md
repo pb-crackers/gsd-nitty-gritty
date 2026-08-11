@@ -67,7 +67,7 @@ Measured, all of it removable with no behaviour change:
 
 | Item | Cost |
 |---|---|
-| `/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs` written out in full, **147×** | ~2,300 tok |
+| ~~Tool path written out in full, 147×~~ — **not recoverable, see below** | ~~2,300 tok~~ |
 | Repeated named steps (`offer_next`, `initialize`, `init_context`, `git_commit`, `update_state`…) | ~5,600 tok |
 | Box-drawing banner art, 77 lines | ~2,100 tok |
 | `if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi` — 52 occurrences in 26 files | ~600 tok |
@@ -76,11 +76,19 @@ The `@file:` line is worth calling out: it is boilerplate in every workflow that
 because `output()` in `core.cjs` spills payloads over 50 KB to a tmpfile. That is the
 tool's problem and it should be solved once in the tool, not restated 52 times in prose.
 
-**Recommendation.** Set `GSD=…gsd-tools.cjs` once per workflow; move the `@file:`
-unwrapping into the tool or a one-line helper; replace banner art with a sentence; extract
-the genuinely-identical steps into `references/` and `@`-include them.
+**Correction — the `GSD=` variable does not work.** Tested after writing this: shell state
+does not persist between Bash tool calls, so a variable set in one fenced block is empty in
+the next. Every block needs the literal path regardless. Measured what survives: only 7
+blocks use the path twice or more, worth ~91 tokens total. The 147 repetitions are the cost
+of the tool not being on `PATH`, and the only real fix is an installed shim — a change to
+the installer, not to the workflows. **Dropped from the plan.**
 
-*Estimate: ~8k tokens, near-zero risk.*
+**Recommendation (revised).** Replace banner art with a sentence; extract the
+genuinely-identical steps into `references/` and `@`-include them. Leave the path alone.
+The `@file:` boilerplate is ~600 tokens and is a symptom of `output()` spilling over the
+50 KB Bash buffer — worth fixing in `core.cjs` on its own merits, not for the token count.
+
+*Estimate: ~7k tokens, near-zero risk.*
 
 ---
 
@@ -194,7 +202,7 @@ have proven nothing broke.
 
 | # | Change | Risk | Est. saving |
 |---|---|---|---|
-| 1 | `GSD=` variable; `@file:` handling moved into the tool | none | ~3k |
+| 1 | ~~`GSD=` variable~~ — dropped, shell state does not persist between calls | — | ~~3k~~ |
 | 2 | Delete banner art, replace with sentences | none | ~2k |
 | 3 | Extract identical repeated steps to `references/` | low | ~5k |
 | 4 | `references/communication.md` + delete scattered presentation rules | low | ~4k |
@@ -203,7 +211,7 @@ have proven nothing broke.
 | 7 | Command files stop restating workflow procedure | low | ~2k |
 | 8 | Example cull, one per idea, five largest files first | **medium** | ~10–14k |
 
-Total *estimate*: **28–32k tokens**, roughly 20–23% of the corpus, concentrated in the
+Total *estimate*: **25–29k tokens**, roughly 18–21% of the corpus, concentrated in the
 commands that cost the most today. `/gsd:new-project` should land near 26–28k.
 
 Step 8 is medium risk because judging which example carries a format contract and which is
