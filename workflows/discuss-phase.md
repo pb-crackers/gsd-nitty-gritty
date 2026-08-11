@@ -84,21 +84,9 @@ Gray areas are **implementation decisions the user cares about** — things that
    - Something being ORGANIZED → criteria, grouping, handling exceptions matter
 3. **Generate phase-specific gray areas** — Not generic categories, but concrete decisions for THIS phase
 
-**Don't use generic category labels** (UI, UX, Behavior). Generate specific gray areas:
-
-```
-Phase: "User authentication"
-→ Session handling, Error responses, Multi-device policy, Recovery flow
-
-Phase: "Organize photo library"
-→ Grouping criteria, Duplicate handling, Naming convention, Folder structure
-
-Phase: "CLI for database backups"
-→ Output format, Flag design, Progress reporting, Error recovery
-
-Phase: "API documentation"
-→ Structure/navigation, Code examples depth, Versioning approach, Interactive elements
-```
+**Don't use generic category labels** (UI, UX, Behavior). Name the actual decision: a phase
+called "User authentication" has gray areas like session handling, multi-device policy and
+recovery flow — not "Security" and "UX".
 
 **The key question:** What decisions would change the outcome that the user should weigh in on?
 
@@ -394,7 +382,7 @@ Analyze the phase to identify gray areas worth discussing. **Use both `prior_dec
 
 **Output your analysis internally, then present to user.**
 
-Example analysis for "Post Feed" phase (pure visual, with code and prior context):
+Example analysis — "Post Feed", carried through to the menu in the next step:
 ```
 Domain: Displaying posts from followed users
 Classification: Pure visual/UX phase — no new backend, APIs, or data
@@ -407,18 +395,6 @@ Gray areas:
 - Empty State: What shows when no posts exist — EmptyState component exists in ui/
 ```
 
-Example analysis for "User Notifications Backend" phase (engineering depth):
-```
-Domain: Backend system for user notifications with delivery and read tracking
-Classification: Engineering depth — new data, API, and logic
-Refactor opportunity: EmailService exists at src/services/email.ts — could extend it or create parallel NotificationService
-Gray areas:
-- Refactor: Extend EmailService or create new NotificationService? [trade-off analysis]
-- Data Model: notifications table vs JSONB on users? [trade-off analysis]
-- API Design: /notifications endpoint vs /users/:id/notifications? [trade-off analysis]
-- Performance: How to handle fan-out for users with many followers? [trade-off analysis]
-- Real-time: WebSocket push vs polling? [trade-off analysis]
-```
 </step>
 
 <step name="present_gray_areas">
@@ -470,30 +446,12 @@ Keep it short. This is the menu, not the meal: enough for the user to choose wha
 
 **Do NOT include a "skip" or "you decide" option in the overall gray area selection.** User ran this command to discuss — give them real choices. HOWEVER, "Accept all recommendations" is valid because it means "I trust your engineering reasoning, let's move on."
 
-**Examples by domain (with code context):**
-
-For "Post Feed" (visual feature):
+The menu for the "Post Feed" analysis above, with the scout's findings annotated in:
 ```
 ☐ Layout style — Cards vs list vs timeline? (Card component exists with variants)
 ☐ Loading behavior — Infinite scroll or pagination? (useInfiniteQuery hook available)
 ☐ Content ordering — Chronological, algorithmic, or user choice?
 ☐ Post metadata — What info per post? Timestamps, reactions, author?
-```
-
-For "Database backup CLI" (command-line tool):
-```
-☐ Output format — JSON, table, or plain text? Verbosity levels?
-☐ Flag design — Short flags, long flags, or both? Required vs optional?
-☐ Progress reporting — Silent, progress bar, or verbose logging?
-☐ Error recovery — Fail fast, retry, or prompt for action?
-```
-
-For "Organize photo library" (organization task):
-```
-☐ Grouping criteria — By date, location, faces, or events?
-☐ Duplicate handling — Keep best, keep all, or prompt each time?
-☐ Naming convention — Original names, dates, or descriptive?
-☐ Folder structure — Flat, nested by year, or by category?
 ```
 
 Continue to discuss_areas with selected areas.
