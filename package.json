@@ -1,0 +1,9 @@
+{
+  "name": "gsd-tools",
+  "version": "1.26.0",
+  "private": true,
+  "description": "GSD workflow tooling — CLI that reads and mutates .planning/ documents",
+  "scripts": {
+    "test": "node test/run.cjs"
+  }
+}

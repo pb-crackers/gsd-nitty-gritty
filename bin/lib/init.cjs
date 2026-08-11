@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { loadConfig, resolveModelInternal, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
+const { loadConfig, resolveModelInternal, countRoadmapCompletedPhases, findPhaseInternal, getRoadmapPhaseInternal, pathExistsInternal, generateSlugInternal, getMilestoneInfo, getMilestonePhaseFilter, stripShippedMilestones, normalizePhaseName, toPosixPath, output, error } = require('./core.cjs');
 
 function cmdInitExecutePhase(cwd, phase, raw) {
   if (!phase) {
@@ -528,24 +528,31 @@ function cmdInitMilestoneOp(cwd, raw) {
   const config = loadConfig(cwd);
   const milestone = getMilestoneInfo(cwd);
 
-  // Count phases
+  // Count phases. ROADMAP checkboxes are canonical for completion — see the
+  // comment on completed_phases in state.cjs. This used to count a phase as
+  // complete when it had ANY summary, so all_phases_complete could go true
+  // while phases were half-executed.
   let phaseCount = 0;
-  let completedPhases = 0;
+  let diskCompletedPhases = 0;
   const phasesDir = path.join(cwd, '.planning', 'phases');
   try {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
     phaseCount = dirs.length;
 
-    // Count phases with summaries (completed)
     for (const dir of dirs) {
       try {
         const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
-        const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
-        if (hasSummary) completedPhases++;
+        const plans = phaseFiles.filter(f => f.endsWith('-PLAN.md') || f === 'PLAN.md').length;
+        const summaries = phaseFiles.filter(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md').length;
+        if (plans > 0 && summaries >= plans) diskCompletedPhases++;
       } catch {}
     }
   } catch {}
+
+  const roadmapPhases = countRoadmapCompletedPhases(cwd);
+  const completedPhases = roadmapPhases ? roadmapPhases.complete : diskCompletedPhases;
+  if (roadmapPhases) phaseCount = Math.max(phaseCount, roadmapPhases.total);
 
   // Check archive
   const archiveDir = path.join(cwd, '.planning', 'archive');
@@ -569,6 +576,11 @@ function cmdInitMilestoneOp(cwd, raw) {
     phase_count: phaseCount,
     completed_phases: completedPhases,
     all_phases_complete: phaseCount > 0 && phaseCount === completedPhases,
+    // Present only while the roadmap and the files on disk disagree, so a
+    // caller can report the discrepancy instead of trusting one silently.
+    ...(roadmapPhases && diskCompletedPhases !== roadmapPhases.complete
+      ? { completed_phases_disk: diskCompletedPhases }
+      : {}),
 
     // Archive
     archived_milestones: archivedMilestones,

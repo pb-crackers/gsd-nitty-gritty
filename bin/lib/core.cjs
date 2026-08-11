@@ -150,6 +150,72 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Regex source that matches a phase number regardless of zero-padding.
+ *
+ * Callers pass `7.5` or `07.5` interchangeably and documents are spelled both
+ * ways in the same file — a ROADMAP table row reading `| 7.5 Media |` next to a
+ * `### Phase 07.5:` heading is normal. Building a pattern from the raw argument
+ * means one spelling silently matches nothing, so always go through this.
+ *
+ * Always use it behind a delimiter (`Phase\s+`, `\|\s*`) so `0*7\.5` cannot
+ * match the tail of `17.5`.
+ */
+function phaseNumPattern(phase) {
+  const value = String(phase).trim();
+  const match = value.match(/^0*(\d+)(.*)$/);
+  if (!match) return escapeRegex(value);
+  return '0*' + escapeRegex(match[1] + match[2]);
+}
+
+// ─── Comment-safe editing ────────────────────────────────────────────────────
+
+const HTML_COMMENT_PATTERN = /<!--[\s\S]*?-->/g;
+
+/**
+ * Blank out HTML comments for read operations, preserving offsets is not
+ * needed — callers only scan the result. STATE.md carries hand-written comment
+ * logs that quote live field values verbatim, and a bare `content.match()`
+ * happily returns the quoted copy instead of the live one.
+ */
+function stripHtmlComments(content) {
+  return content.replace(HTML_COMMENT_PATTERN, '');
+}
+
+/**
+ * Replace `pattern` only outside HTML comments.
+ *
+ * The comment blocks in STATE.md are historical evidence: they quote the exact
+ * strings the tools write. An unanchored replace rewrites that record — and,
+ * because the patterns end in `.*`, truncates the rest of the quoted line too.
+ * A non-global pattern still replaces at most one occurrence document-wide.
+ */
+function replaceOutsideComments(content, pattern, replacement) {
+  const segments = [];
+  let cursor = 0;
+  let match;
+  HTML_COMMENT_PATTERN.lastIndex = 0;
+  while ((match = HTML_COMMENT_PATTERN.exec(content)) !== null) {
+    segments.push({ text: content.slice(cursor, match.index), commented: false });
+    segments.push({ text: match[0], commented: true });
+    cursor = match.index + match[0].length;
+  }
+  segments.push({ text: content.slice(cursor), commented: false });
+
+  let spent = false;
+  return segments
+    .map(segment => {
+      if (segment.commented) return segment.text;
+      if (!pattern.global) {
+        if (spent) return segment.text;
+        if (!new RegExp(pattern.source, pattern.flags).test(segment.text)) return segment.text;
+        spent = true;
+      }
+      return segment.text.replace(pattern, replacement);
+    })
+    .join('');
+}
+
 function normalizePhaseName(phase) {
   const match = String(phase).match(/^(\d+)([A-Z])?((?:\.\d+)*)/i);
   if (!match) return phase;
@@ -341,7 +407,7 @@ function getRoadmapPhaseInternal(cwd, phaseNum) {
 
   try {
     const content = stripShippedMilestones(fs.readFileSync(roadmapPath, 'utf-8'));
-    const escapedPhase = escapeRegex(phaseNum.toString());
+    const escapedPhase = phaseNumPattern(phaseNum);
     const phasePattern = new RegExp(`#{2,4}\\s*Phase\\s+${escapedPhase}:\\s*([^\\n]+)`, 'i');
     const headerMatch = content.match(phasePattern);
     if (!headerMatch) return null;
@@ -438,6 +504,40 @@ function getMilestoneInfo(cwd) {
 }
 
 /**
+ * Count completed phases from the ROADMAP.md checklist of the current milestone.
+ *
+ * ROADMAP checkboxes are the canonical answer to "how many phases are complete"
+ * — see the comment on completed_phases in state.cjs for why. Returns null when
+ * the roadmap has no phase checklist at all, so callers can fall back to disk.
+ *
+ * Matches `- [x] **Phase 7.5: ...` padding-insensitively and ignores plan-level
+ * checkboxes (`- [x] 07.5-01-PLAN.md`), which are not phases.
+ */
+function countRoadmapCompletedPhases(cwd) {
+  let content;
+  try {
+    content = stripShippedMilestones(fs.readFileSync(path.join(cwd, '.planning', 'ROADMAP.md'), 'utf-8'));
+  } catch {
+    return null;
+  }
+
+  const checkboxPattern = /^[ \t]*-[ \t]*\[([ xX])\][ \t]*\*{0,2}Phase[ \t]+(\d+[A-Za-z]?(?:\.\d+)*)/gm;
+  const seen = new Map();
+  let match;
+  while ((match = checkboxPattern.exec(content)) !== null) {
+    const phase = normalizePhaseName(match[2]);
+    // A phase listed twice counts once, and complete wins over incomplete.
+    seen.set(phase, (seen.get(phase) || false) || match[1].toLowerCase() === 'x');
+  }
+
+  if (seen.size === 0) return null;
+
+  let complete = 0;
+  for (const isComplete of seen.values()) if (isComplete) complete++;
+  return { complete, total: seen.size };
+}
+
+/**
  * Returns a filter function that checks whether a phase directory belongs
  * to the current milestone based on ROADMAP.md phase headings.
  * If no ROADMAP exists or no phases are listed, returns a pass-all filter.
@@ -480,8 +580,12 @@ module.exports = {
   isGitIgnored,
   execGit,
   escapeRegex,
+  phaseNumPattern,
+  stripHtmlComments,
+  replaceOutsideComments,
   normalizePhaseName,
   comparePhaseNum,
+  countRoadmapCompletedPhases,
   searchPhaseInDir,
   findPhaseInternal,
   getArchivedPhaseDirs,

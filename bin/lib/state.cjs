@@ -4,19 +4,122 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter, output, error } = require('./core.cjs');
+const {
+  escapeRegex, loadConfig, getMilestoneInfo, getMilestonePhaseFilter,
+  countRoadmapCompletedPhases, stripHtmlComments, replaceOutsideComments,
+  output, error,
+} = require('./core.cjs');
 const { extractFrontmatter, reconstructFrontmatter } = require('./frontmatter.cjs');
 
-// Shared helper: extract a field value from STATE.md content.
-// Supports both **Field:** bold and plain Field: format.
-function stateExtractField(content, fieldName) {
+// ─── Scoped field access ─────────────────────────────────────────────────────
+//
+// STATE.md is not a data file. It is a hand-edited document that carries
+// HTML-comment logs quoting the exact strings these tools write, plus prose
+// sections that restate live values. Reading or writing a field by scanning the
+// whole document therefore finds quoted history as readily as the live value —
+// and a non-global replace against the first hit rewrote that history while
+// skipping the field it meant to update.
+//
+// Every field read and write goes through the helpers below, which:
+//   1. prefer the live "## Current Position" section for the fields it owns, and
+//   2. never touch anything inside an HTML comment.
+
+/** Fields that live in § Current Position and must be read/written there. */
+const POSITION_FIELDS = new Set([
+  'Current Phase',
+  'Current Phase Name',
+  'Total Phases',
+  'Current Plan',
+  'Total Plans in Phase',
+  'Status',
+  'Progress',
+  'Last Activity',
+  'Last Activity Description',
+]);
+
+/** Locate the live § Current Position section, or null when absent. */
+function currentPositionRange(content) {
+  const heading = content.match(/^#{2,3}[ \t]*Current Position[ \t]*$/mi);
+  if (!heading) return null;
+  const start = heading.index;
+  const afterHeading = start + heading[0].length;
+  const next = content.slice(afterHeading).match(/^##[ \t]+\S/m);
+  return { start, end: next ? afterHeading + next.index : content.length };
+}
+
+/**
+ * The regions of `content` a field may legitimately be read from or written to,
+ * in priority order: § Current Position first when the field belongs to it.
+ */
+function fieldScope(content, fieldName) {
+  if (POSITION_FIELDS.has(fieldName)) {
+    const range = currentPositionRange(content);
+    if (range) return { start: range.start, end: range.end };
+  }
+  return null;
+}
+
+function fieldPatterns(fieldName) {
   const escaped = escapeRegex(fieldName);
-  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*\\s*(.+)`, 'i');
-  const boldMatch = content.match(boldPattern);
-  if (boldMatch) return boldMatch[1].trim();
-  const plainPattern = new RegExp(`^${escaped}:\\s*(.+)`, 'im');
-  const plainMatch = content.match(plainPattern);
-  return plainMatch ? plainMatch[1].trim() : null;
+  return {
+    bold: new RegExp(`\\*\\*${escaped}:\\*\\*[ \\t]*([^\\n]*)`, 'i'),
+    plain: new RegExp(`^${escaped}:[ \\t]*([^\\n]*)`, 'im'),
+  };
+}
+
+/**
+ * Extract a field value from STATE.md. Prefers § Current Position for the
+ * fields it owns and always ignores HTML comments.
+ * Supports both **Field:** bold and plain Field: format.
+ */
+function stateExtractField(content, fieldName) {
+  const { bold, plain } = fieldPatterns(fieldName);
+  const scope = fieldScope(content, fieldName);
+
+  const search = (text) => {
+    const clean = stripHtmlComments(text);
+    const boldMatch = clean.match(bold);
+    if (boldMatch && boldMatch[1].trim()) return boldMatch[1].trim();
+    const plainMatch = clean.match(plain);
+    if (plainMatch && plainMatch[1].trim()) return plainMatch[1].trim();
+    return null;
+  };
+
+  if (scope) {
+    const scoped = search(content.slice(scope.start, scope.end));
+    if (scoped !== null) return scoped;
+  }
+  return search(content);
+}
+
+/**
+ * Replace a field's value in STATE.md, scoped to § Current Position where that
+ * applies and never inside an HTML comment. Returns null when the field was not
+ * found, matching the previous contract.
+ */
+function stateReplaceField(content, fieldName, newValue) {
+  const escaped = escapeRegex(fieldName);
+  const boldPattern = new RegExp(`(\\*\\*${escaped}:\\*\\*[ \\t]*)[^\\n]*`, 'i');
+  const plainPattern = new RegExp(`(^${escaped}:[ \\t]*)[^\\n]*`, 'im');
+
+  const applyTo = (text) => {
+    for (const pattern of [boldPattern, plainPattern]) {
+      // Decide presence outside comments, so setting a field to the value it
+      // already holds still counts as found rather than as missing.
+      if (!new RegExp(pattern.source, pattern.flags).test(stripHtmlComments(text))) continue;
+      return replaceOutsideComments(text, pattern, (_m, prefix) => `${prefix}${newValue}`);
+    }
+    return null;
+  };
+
+  const scope = fieldScope(content, fieldName);
+  if (scope) {
+    const updated = applyTo(content.slice(scope.start, scope.end));
+    if (updated !== null) {
+      return content.slice(0, scope.start) + updated + content.slice(scope.end);
+    }
+  }
+  return applyTo(content);
 }
 
 function cmdStateLoad(cwd, raw) {
@@ -74,26 +177,16 @@ function cmdStateGet(cwd, section, raw) {
       return;
     }
 
-    // Try to find markdown section or field
-    const fieldEscaped = section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // Check for **field:** value (bold format)
-    const boldPattern = new RegExp(`\\*\\*${fieldEscaped}:\\*\\*\\s*(.*)`, 'i');
-    const boldMatch = content.match(boldPattern);
-    if (boldMatch) {
-      output({ [section]: boldMatch[1].trim() }, raw, boldMatch[1].trim());
-      return;
-    }
-
-    // Check for field: value (plain format)
-    const plainPattern = new RegExp(`^${fieldEscaped}:\\s*(.*)`, 'im');
-    const plainMatch = content.match(plainPattern);
-    if (plainMatch) {
-      output({ [section]: plainMatch[1].trim() }, raw, plainMatch[1].trim());
+    // Field lookup: scoped to § Current Position where the field belongs there,
+    // and never reading a value quoted inside an HTML-comment log.
+    const fieldValue = stateExtractField(content, section);
+    if (fieldValue !== null) {
+      output({ [section]: fieldValue }, raw, fieldValue);
       return;
     }
 
     // Check for ## Section
+    const fieldEscaped = escapeRegex(section);
     const sectionPattern = new RegExp(`##\\s*${fieldEscaped}\\s*\n([\\s\\S]*?)(?=\\n##|$)`, 'i');
     const sectionMatch = content.match(sectionPattern);
     if (sectionMatch) {
@@ -125,20 +218,19 @@ function cmdStatePatch(cwd, patches, raw) {
     const results = { updated: [], failed: [] };
 
     for (const [field, value] of Object.entries(patches)) {
-      const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Try **Field:** bold format first, then plain Field: format
-      const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-      const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
-
-      if (boldPattern.test(content)) {
-        content = content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
-        results.updated.push(field);
-      } else if (plainPattern.test(content)) {
-        content = content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
-        results.updated.push(field);
-      } else {
-        results.failed.push(field);
+      // `--current-plan` is the documented spelling; the field is `Current Plan`.
+      const candidates = [field, field.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())];
+      let applied = false;
+      for (const candidate of candidates) {
+        const next = stateReplaceField(content, candidate, value);
+        if (next !== null) {
+          content = next;
+          results.updated.push(field);
+          applied = true;
+          break;
+        }
       }
+      if (!applied) results.failed.push(field);
     }
 
     if (results.updated.length > 0) {
@@ -158,18 +250,10 @@ function cmdStateUpdate(cwd, field, value) {
 
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
-    let content = fs.readFileSync(statePath, 'utf-8');
-    const fieldEscaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Try **Field:** bold format first, then plain Field: format
-    const boldPattern = new RegExp(`(\\*\\*${fieldEscaped}:\\*\\*\\s*)(.*)`, 'i');
-    const plainPattern = new RegExp(`(^${fieldEscaped}:\\s*)(.*)`, 'im');
-    if (boldPattern.test(content)) {
-      content = content.replace(boldPattern, (_match, prefix) => `${prefix}${value}`);
-      writeStateMd(statePath, content, cwd);
-      output({ updated: true });
-    } else if (plainPattern.test(content)) {
-      content = content.replace(plainPattern, (_match, prefix) => `${prefix}${value}`);
-      writeStateMd(statePath, content, cwd);
+    const content = fs.readFileSync(statePath, 'utf-8');
+    const next = stateReplaceField(content, field, value);
+    if (next !== null) {
+      writeStateMd(statePath, next, cwd);
       output({ updated: true });
     } else {
       output({ updated: false, reason: `Field "${field}" not found in STATE.md` });
@@ -179,32 +263,45 @@ function cmdStateUpdate(cwd, field, value) {
   }
 }
 
-// ─── State Progression Engine ────────────────────────────────────────────────
-
-function stateExtractField(content, fieldName) {
-  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Try **Field:** bold format first
-  const boldPattern = new RegExp(`\\*\\*${escaped}:\\*\\*\\s*(.+)`, 'i');
-  const boldMatch = content.match(boldPattern);
-  if (boldMatch) return boldMatch[1].trim();
-  // Fall back to plain Field: format
-  const plainPattern = new RegExp(`^${escaped}:\\s*(.+)`, 'im');
-  const plainMatch = content.match(plainPattern);
-  return plainMatch ? plainMatch[1].trim() : null;
+/**
+ * Apply a raw pattern to STATE.md, restricted to § Current Position when that
+ * section exists and never inside an HTML comment.
+ *
+ * For edits that are not a simple `**Field:** value` line — loose patterns like
+ * `of N phases` in particular, which will otherwise match the first such phrase
+ * anywhere in a 3,000-line document, comment logs and prose included.
+ */
+function replaceInCurrentPosition(content, pattern, replacement) {
+  const range = currentPositionRange(content);
+  if (range) {
+    const section = content.slice(range.start, range.end);
+    const updated = replaceOutsideComments(section, pattern, replacement);
+    if (updated !== section) {
+      return content.slice(0, range.start) + updated + content.slice(range.end);
+    }
+  }
+  return replaceOutsideComments(content, pattern, replacement);
 }
 
-function stateReplaceField(content, fieldName, newValue) {
-  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Try **Field:** bold format first, then plain Field: format
-  const boldPattern = new RegExp(`(\\*\\*${escaped}:\\*\\*\\s*)(.*)`, 'i');
-  if (boldPattern.test(content)) {
-    return content.replace(boldPattern, (_match, prefix) => `${prefix}${newValue}`);
-  }
-  const plainPattern = new RegExp(`(^${escaped}:\\s*)(.*)`, 'im');
-  if (plainPattern.test(content)) {
-    return content.replace(plainPattern, (_match, prefix) => `${prefix}${newValue}`);
-  }
-  return null;
+// ─── State Progression Engine ────────────────────────────────────────────────
+
+/**
+ * Parse a plan counter written by a human.
+ *
+ * These fields are hand-maintained, so they arrive as `6`, `03 of 9`, `3/9` or
+ * `Not started`. A bare parseInt on `3/9` silently yields 3, and the fields that
+ * genuinely cannot be read produced an error naming neither of them.
+ *
+ * `position` takes the numerator (where we are), `total` takes the denominator
+ * (how many there are) when the value carries both.
+ */
+function parsePlanCounter(value, role) {
+  if (value === null || value === undefined) return NaN;
+  const text = String(value).trim();
+  const pair = text.match(/(\d+)\s*(?:\/|\s+of\s+)\s*(\d+)/i);
+  if (pair) return parseInt(pair[role === 'total' ? 2 : 1], 10);
+  const single = text.match(/\d+/);
+  return single ? parseInt(single[0], 10) : NaN;
 }
 
 function cmdStateAdvancePlan(cwd, raw) {
@@ -212,12 +309,21 @@ function cmdStateAdvancePlan(cwd, raw) {
   if (!fs.existsSync(statePath)) { output({ error: 'STATE.md not found' }, raw); return; }
 
   let content = fs.readFileSync(statePath, 'utf-8');
-  const currentPlan = parseInt(stateExtractField(content, 'Current Plan'), 10);
-  const totalPlans = parseInt(stateExtractField(content, 'Total Plans in Phase'), 10);
+  const currentPlanRaw = stateExtractField(content, 'Current Plan');
+  const totalPlansRaw = stateExtractField(content, 'Total Plans in Phase');
+  const currentPlan = parsePlanCounter(currentPlanRaw, 'position');
+  const totalPlans = parsePlanCounter(totalPlansRaw, 'total');
   const today = new Date().toISOString().split('T')[0];
 
   if (isNaN(currentPlan) || isNaN(totalPlans)) {
-    output({ error: 'Cannot parse Current Plan or Total Plans in Phase from STATE.md' }, raw);
+    const unreadable = [];
+    if (isNaN(currentPlan)) unreadable.push(`Current Plan (${JSON.stringify(currentPlanRaw)})`);
+    if (isNaN(totalPlans)) unreadable.push(`Total Plans in Phase (${JSON.stringify(totalPlansRaw)})`);
+    output({
+      error: `Cannot parse ${unreadable.join(' or ')} from STATE.md § Current Position`,
+      current_plan_raw: currentPlanRaw,
+      total_plans_raw: totalPlansRaw,
+    }, raw);
     return;
   }
 
@@ -299,16 +405,12 @@ function cmdStateUpdateProgress(cwd, raw) {
   const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(barWidth - filled);
   const progressStr = `[${bar}] ${percent}%`;
 
-  // Try **Progress:** bold format first, then plain Progress: format
-  const boldProgressPattern = /(\*\*Progress:\*\*\s*).*/i;
-  const plainProgressPattern = /^(Progress:\s*).*/im;
-  if (boldProgressPattern.test(content)) {
-    content = content.replace(boldProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
-    writeStateMd(statePath, content, cwd);
-    output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
-  } else if (plainProgressPattern.test(content)) {
-    content = content.replace(plainProgressPattern, (_match, prefix) => `${prefix}${progressStr}`);
-    writeStateMd(statePath, content, cwd);
+  // Scoped to § Current Position and outside comments — a Progress bar quoted
+  // in a comment log used to absorb the write, leaving the live bar stale and
+  // the frontmatter percent oscillating between two readings of the same file.
+  const next = stateReplaceField(content, 'Progress', progressStr);
+  if (next !== null) {
+    writeStateMd(statePath, next, cwd);
     output({ updated: true, percent, completed: totalSummaries, total: totalPlans, bar: progressStr }, raw, progressStr);
   } else {
     output({ updated: false, reason: 'Progress field not found in STATE.md' }, raw, 'false');
@@ -552,12 +654,54 @@ function cmdStateSnapshot(cwd, raw) {
 
 // ─── State Frontmatter Sync ──────────────────────────────────────────────────
 
+/** The only values `status:` may ever hold. */
+const STATE_STATUSES = ['planning', 'discussing', 'executing', 'verifying', 'paused', 'completed', 'unknown'];
+
+/**
+ * Map a human-written Status line onto the enum, or return null when it does
+ * not correspond to any known state.
+ *
+ * Returning null rather than the raw sentence is the point: § Current Position's
+ * Status is prose written for a human, and passing it through unrecognized is
+ * how "All six plans executed, the blocking checkpoint APPROVED, …" ended up in
+ * a machine-read enum field. Note `executed` is not `executing`.
+ */
+function normalizeStatusValue(status, pausedAt) {
+  const text = String(status || '').toLowerCase();
+  if (pausedAt) return 'paused';
+  if (!text) return null;
+  if (text.includes('paused') || text.includes('stopped')) return 'paused';
+  if (text.includes('executing') || text.includes('in progress')) return 'executing';
+  if (text.includes('planning') || text.includes('ready to plan')) return 'planning';
+  if (text.includes('discussing')) return 'discussing';
+  if (text.includes('verif')) return 'verifying';
+  if (text.includes('complete') || text.includes('done')) return 'completed';
+  if (text.includes('ready to execute')) return 'executing';
+  return null;
+}
+
 /**
  * Extract machine-readable fields from STATE.md markdown body and build
  * a YAML frontmatter object. Allows hooks and scripts to read state
  * reliably via `state json` instead of fragile regex parsing.
+ *
+ * DESIGN — how the body and the frontmatter relate.
+ *
+ * The body is the source for fields a human maintains there, but it is prose
+ * and it can fail to parse. Previously every command rebuilt the whole
+ * frontmatter from a fresh scrape, so a value the body could not supply was
+ * overwritten with a guess, and any hand-correction was reverted by the next
+ * `state *` call — which is why the project's agents derived a standing rule to
+ * hand-correct last.
+ *
+ * So: the scrape proposes, the existing frontmatter persists. A scraped value
+ * is written only when it parses to something valid; otherwise the value
+ * already in the frontmatter is preserved. No command can clobber a field with
+ * a value it failed to read.
  */
-function buildStateFrontmatter(bodyContent, cwd) {
+function buildStateFrontmatter(bodyContent, cwd, existing) {
+  const prior = existing && typeof existing === 'object' ? existing : {};
+  const priorProgress = (prior.progress && typeof prior.progress === 'object') ? prior.progress : {};
   const currentPhase = stateExtractField(bodyContent, 'Current Phase');
   const currentPhaseName = stateExtractField(bodyContent, 'Current Phase Name');
   const currentPlan = stateExtractField(bodyContent, 'Current Plan');
@@ -580,9 +724,10 @@ function buildStateFrontmatter(bodyContent, cwd) {
   }
 
   let totalPhases = totalPhasesRaw ? parseInt(totalPhasesRaw, 10) : null;
-  let completedPhases = null;
-  let totalPlans = totalPlansRaw ? parseInt(totalPlansRaw, 10) : null;
+  let totalPlans = totalPlansRaw ? parsePlanCounter(totalPlansRaw, 'total') : null;
+  if (Number.isNaN(totalPlans)) totalPlans = null;
   let completedPlans = null;
+  let diskCompletedPhases = null;
 
   if (cwd) {
     try {
@@ -594,7 +739,7 @@ function buildStateFrontmatter(bodyContent, cwd) {
           .filter(isDirInMilestone);
         let diskTotalPlans = 0;
         let diskTotalSummaries = 0;
-        let diskCompletedPhases = 0;
+        let diskComplete = 0;
 
         for (const dir of phaseDirs) {
           const files = fs.readdirSync(path.join(phasesDir, dir));
@@ -602,62 +747,100 @@ function buildStateFrontmatter(bodyContent, cwd) {
           const summaries = files.filter(f => f.match(/-SUMMARY\.md$/i)).length;
           diskTotalPlans += plans;
           diskTotalSummaries += summaries;
-          if (plans > 0 && summaries >= plans) diskCompletedPhases++;
+          if (plans > 0 && summaries >= plans) diskComplete++;
         }
         totalPhases = isDirInMilestone.phaseCount > 0
           ? Math.max(phaseDirs.length, isDirInMilestone.phaseCount)
           : phaseDirs.length;
-        completedPhases = diskCompletedPhases;
+        diskCompletedPhases = diskComplete;
         totalPlans = diskTotalPlans;
         completedPlans = diskTotalSummaries;
       }
     } catch {}
   }
 
+  // DESIGN — which count of completed phases is canonical.
+  //
+  // Three sources disagreed: files on disk (a phase dir counts as complete when
+  // summaries >= plans), the ROADMAP.md checkboxes, and this frontmatter field.
+  // ROADMAP checkboxes win, for two reasons:
+  //
+  //   1. A checkbox is a decision; the disk shape is a side effect. Completion
+  //      is declared by `phase complete` (and by humans closing a phase on a
+  //      verdict), and plans added after their summaries, or phases finished
+  //      before GSD tracked them, make summaries >= plans simply wrong.
+  //   2. The codebase already believes this. roadmap analyze promotes a phase
+  //      to complete when the roadmap says so and the disk does not.
+  //
+  // Deriving from disk is what let `phase complete` DECREMENT the count at the
+  // moment a phase was completed. When disk disagrees, the disk number is kept
+  // alongside as completed_phases_disk rather than dropped — the tool reports
+  // the discrepancy instead of quietly picking a winner.
+  let completedPhases = null;
+  let completedPhasesDisk = null;
+  const roadmapPhases = cwd ? countRoadmapCompletedPhases(cwd) : null;
+  if (roadmapPhases) {
+    completedPhases = roadmapPhases.complete;
+    if (diskCompletedPhases !== null && diskCompletedPhases !== roadmapPhases.complete) {
+      completedPhasesDisk = diskCompletedPhases;
+    }
+  } else if (diskCompletedPhases !== null) {
+    // No phase checklist in the roadmap at all — disk is the only answer there is.
+    completedPhases = diskCompletedPhases;
+  }
+
+  // Percent is derived from the plan counts in this same block rather than
+  // scraped from the body's ASCII bar, so the frontmatter cannot contradict
+  // itself (108 of 108 plans reading 95%) depending on which command wrote last.
   let progressPercent = null;
-  if (progressRaw) {
+  if (totalPlans !== null && completedPlans !== null && totalPlans > 0) {
+    progressPercent = Math.min(100, Math.round((completedPlans / totalPlans) * 100));
+  } else if (progressRaw) {
     const pctMatch = progressRaw.match(/(\d+)%/);
     if (pctMatch) progressPercent = parseInt(pctMatch[1], 10);
   }
 
-  // Normalize status to one of: planning, discussing, executing, verifying, paused, completed, unknown
-  let normalizedStatus = status || 'unknown';
-  const statusLower = (status || '').toLowerCase();
-  if (statusLower.includes('paused') || statusLower.includes('stopped') || pausedAt) {
-    normalizedStatus = 'paused';
-  } else if (statusLower.includes('executing') || statusLower.includes('in progress')) {
-    normalizedStatus = 'executing';
-  } else if (statusLower.includes('planning') || statusLower.includes('ready to plan')) {
-    normalizedStatus = 'planning';
-  } else if (statusLower.includes('discussing')) {
-    normalizedStatus = 'discussing';
-  } else if (statusLower.includes('verif')) {
-    normalizedStatus = 'verifying';
-  } else if (statusLower.includes('complete') || statusLower.includes('done')) {
-    normalizedStatus = 'completed';
-  } else if (statusLower.includes('ready to execute')) {
-    normalizedStatus = 'executing';
-  }
+  // A Status the tool cannot map is not a status. Keep whatever valid value the
+  // frontmatter already holds rather than writing prose into the enum.
+  // Fall back through the same normalizer, so a near-miss written by hand
+  // (`status: complete`) is understood rather than discarded as `unknown`.
+  const normalizedStatus = normalizeStatusValue(status, pausedAt);
+  const fallbackStatus = STATE_STATUSES.includes(prior.status)
+    ? prior.status
+    : (normalizeStatusValue(prior.status, pausedAt) || 'unknown');
 
   const fm = { gsd_state_version: '1.0' };
 
-  if (milestone) fm.milestone = milestone;
-  if (milestoneName) fm.milestone_name = milestoneName;
-  if (currentPhase) fm.current_phase = currentPhase;
-  if (currentPhaseName) fm.current_phase_name = currentPhaseName;
-  if (currentPlan) fm.current_plan = currentPlan;
-  fm.status = normalizedStatus;
-  if (stoppedAt) fm.stopped_at = stoppedAt;
-  if (pausedAt) fm.paused_at = pausedAt;
+  // `keep` writes a scraped value when there is one and preserves the stored
+  // value otherwise, so no command overwrites a field it could not read.
+  const keep = (key, scraped) => {
+    const value = (scraped !== null && scraped !== undefined && scraped !== '') ? scraped : prior[key];
+    if (value !== null && value !== undefined && value !== '') fm[key] = value;
+  };
+
+  keep('milestone', milestone);
+  keep('milestone_name', milestoneName);
+  keep('current_phase', currentPhase);
+  keep('current_phase_name', currentPhaseName);
+  keep('current_plan', currentPlan);
+  fm.status = normalizedStatus || fallbackStatus;
+  keep('stopped_at', stoppedAt);
+  keep('paused_at', pausedAt);
   fm.last_updated = new Date().toISOString();
-  if (lastActivity) fm.last_activity = lastActivity;
+  keep('last_activity', lastActivity);
 
   const progress = {};
-  if (totalPhases !== null) progress.total_phases = totalPhases;
-  if (completedPhases !== null) progress.completed_phases = completedPhases;
-  if (totalPlans !== null) progress.total_plans = totalPlans;
-  if (completedPlans !== null) progress.completed_plans = completedPlans;
-  if (progressPercent !== null) progress.percent = progressPercent;
+  const keepProgress = (key, scraped) => {
+    const value = (scraped !== null && scraped !== undefined) ? scraped : priorProgress[key];
+    if (value !== null && value !== undefined) progress[key] = value;
+  };
+  keepProgress('total_phases', totalPhases);
+  keepProgress('completed_phases', completedPhases);
+  keepProgress('total_plans', totalPlans);
+  keepProgress('completed_plans', completedPlans);
+  keepProgress('percent', progressPercent);
+  // Only present while the sources disagree; it disappears once they are reconciled.
+  if (completedPhasesDisk !== null) progress.completed_phases_disk = completedPhasesDisk;
   if (Object.keys(progress).length > 0) fm.progress = progress;
 
   return fm;
@@ -669,7 +852,10 @@ function stripFrontmatter(content) {
 
 function syncStateFrontmatter(content, cwd) {
   const body = stripFrontmatter(content);
-  const fm = buildStateFrontmatter(body, cwd);
+  // The frontmatter already on disk is an input, not something to be discarded:
+  // it carries the values a scrape of the body cannot recover.
+  const existing = extractFrontmatter(content);
+  const fm = buildStateFrontmatter(body, cwd, existing);
   const yamlStr = reconstructFrontmatter(fm);
   return `---\n${yamlStr}\n---\n\n${body}`;
 }
@@ -695,7 +881,7 @@ function cmdStateJson(cwd, raw) {
 
   if (!fm || Object.keys(fm).length === 0) {
     const body = stripFrontmatter(content);
-    const built = buildStateFrontmatter(body, cwd);
+    const built = buildStateFrontmatter(body, cwd, null);
     output(built, raw, JSON.stringify(built, null, 2));
     return;
   }
@@ -706,6 +892,7 @@ function cmdStateJson(cwd, raw) {
 module.exports = {
   stateExtractField,
   stateReplaceField,
+  replaceInCurrentPosition,
   writeStateMd,
   cmdStateLoad,
   cmdStateGet,

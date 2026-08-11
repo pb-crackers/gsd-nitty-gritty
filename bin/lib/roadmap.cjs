@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, replaceInCurrentMilestone } = require('./core.cjs');
+const { escapeRegex, phaseNumPattern, normalizePhaseName, output, error, findPhaseInternal, stripShippedMilestones, replaceInCurrentMilestone } = require('./core.cjs');
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
@@ -17,8 +17,8 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
   try {
     const content = stripShippedMilestones(fs.readFileSync(roadmapPath, 'utf-8'));
 
-    // Escape special regex chars in phase number, handle decimal
-    const escapedPhase = escapeRegex(phaseNum);
+    // Padding-insensitive: a caller's `7.5` must find a `### Phase 07.5:` heading
+    const escapedPhase = phaseNumPattern(phaseNum);
 
     // Match "## Phase X:", "### Phase X:", or "#### Phase X:" with optional name
     const phasePattern = new RegExp(
@@ -153,8 +153,9 @@ function cmdRoadmapAnalyze(cwd, raw) {
       }
     } catch {}
 
-    // Check ROADMAP checkbox status
-    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s]`, 'i');
+    // Check ROADMAP checkbox status. The heading may be padded while the
+    // checklist is not (or vice versa), so match padding-insensitively.
+    const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${phaseNumPattern(phaseNum)}[:\\s]`, 'i');
     const checkboxMatch = content.match(checkboxPattern);
     const roadmapComplete = checkboxMatch ? checkboxMatch[1] === 'x' : false;
 
@@ -254,8 +255,27 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     return;
   }
 
-  let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
-  const phaseEscaped = escapeRegex(phaseNum);
+  const originalContent = fs.readFileSync(roadmapPath, 'utf-8');
+  let roadmapContent = originalContent;
+  // Padding-insensitive: the table row may read `| 7.5 Media |` while the
+  // caller passes `07.5`. Building this from the raw argument is what made
+  // every replace below a silent no-op.
+  const phaseEscaped = phaseNumPattern(phaseNum);
+
+  // Track each site independently so the result says what actually changed,
+  // and separately whether the pattern matched at all — "the row is already
+  // right" and "there is no such row" are different facts and only one of them
+  // is a problem.
+  const changed = [];
+  const matched = [];
+  const applyEdit = (label, pattern, replacement) => {
+    if (pattern.test(stripShippedMilestones(roadmapContent))) matched.push(label);
+    const next = replaceInCurrentMilestone(roadmapContent, pattern, replacement);
+    if (next !== roadmapContent) {
+      roadmapContent = next;
+      changed.push(label);
+    }
+  };
 
   // Progress table row: update Plans column (summaries/plans) and Status column
   const tablePattern = new RegExp(
@@ -263,8 +283,8 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     'i'
   );
   const dateField = isComplete ? ` ${today} ` : '  ';
-  roadmapContent = replaceInCurrentMilestone(
-    roadmapContent, tablePattern,
+  applyEdit(
+    'progress_table', tablePattern,
     `$1 ${summaryCount}/${planCount} $2 ${status.padEnd(11)}$3${dateField}$4`
   );
 
@@ -276,7 +296,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
   const planCountText = isComplete
     ? `${summaryCount}/${planCount} plans complete`
     : `${summaryCount}/${planCount} plans executed`;
-  roadmapContent = replaceInCurrentMilestone(roadmapContent, planCountPattern, `$1${planCountText}`);
+  applyEdit('phase_detail', planCountPattern, `$1${planCountText}`);
 
   // If complete: check checkbox
   if (isComplete) {
@@ -284,7 +304,26 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
       `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
       'i'
     );
-    roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
+    applyEdit('checklist_checkbox', checkboxPattern, `$1x$2 (completed ${today})`);
+  }
+
+  // Never write back byte-identical content and never claim a write that did
+  // not happen — a tool that reports success into an unchanged file leaves
+  // nothing for a human to notice.
+  if (roadmapContent === originalContent) {
+    output({
+      updated: false,
+      reason: matched.length > 0
+        ? `ROADMAP.md already up to date for phase ${phaseNum}`
+        : `No matching ROADMAP.md content for phase ${phaseNum} in the current milestone`,
+      matched_sections: matched,
+      phase: phaseNum,
+      plan_count: planCount,
+      summary_count: summaryCount,
+      status,
+      complete: isComplete,
+    }, raw, `${summaryCount}/${planCount} ${status} (no roadmap change)`);
+    return;
   }
 
   fs.writeFileSync(roadmapPath, roadmapContent, 'utf-8');
@@ -296,6 +335,7 @@ function cmdRoadmapUpdatePlanProgress(cwd, phaseNum, raw) {
     summary_count: summaryCount,
     status,
     complete: isComplete,
+    sections_updated: changed,
   }, raw, `${summaryCount}/${planCount} ${status}`);
 }
 

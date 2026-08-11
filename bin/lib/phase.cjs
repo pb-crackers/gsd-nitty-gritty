@@ -4,9 +4,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { escapeRegex, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, replaceInCurrentMilestone, toPosixPath, output, error } = require('./core.cjs');
+const { escapeRegex, phaseNumPattern, normalizePhaseName, comparePhaseNum, findPhaseInternal, getArchivedPhaseDirs, generateSlugInternal, getMilestonePhaseFilter, stripShippedMilestones, replaceInCurrentMilestone, toPosixPath, output, error } = require('./core.cjs');
 const { extractFrontmatter } = require('./frontmatter.cjs');
-const { writeStateMd } = require('./state.cjs');
+const { writeStateMd, stateReplaceField, stateExtractField, replaceInCurrentPosition } = require('./state.cjs');
 
 function cmdPhasesList(cwd, options, raw) {
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -381,9 +381,7 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
 
   // Normalize input then strip leading zeros for flexible matching
   const normalizedAfter = normalizePhaseName(afterPhase);
-  const unpadded = normalizedAfter.replace(/^0+/, '');
-  const afterPhaseEscaped = unpadded.replace(/\./g, '\\.');
-  const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+0*${afterPhaseEscaped}:`, 'i');
+  const targetPattern = new RegExp(`#{2,4}\\s*Phase\\s+${phaseNumPattern(normalizedAfter)}:`, 'i');
   if (!targetPattern.test(content)) {
     error(`Phase ${afterPhase} not found in ROADMAP.md`);
   }
@@ -604,8 +602,9 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   // Update ROADMAP.md
   let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
-  // Remove the target phase section
-  const targetEscaped = escapeRegex(targetPhase);
+  // Remove the target phase section. Padding-insensitive: the heading may be
+  // padded where the checklist and table row are not.
+  const targetEscaped = phaseNumPattern(targetPhase);
   const sectionPattern = new RegExp(
     `\\n?#{2,4}\\s*Phase\\s+${targetEscaped}\\s*:[\\s\\S]*?(?=\\n#{2,4}\\s+Phase\\s+\\d|$)`,
     'i'
@@ -671,20 +670,24 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   if (fs.existsSync(statePath)) {
     let stateContent = fs.readFileSync(statePath, 'utf-8');
-    // Update "Total Phases" field
-    const totalPattern = /(\*\*Total Phases:\*\*\s*)(\d+)/;
-    const totalMatch = stateContent.match(totalPattern);
-    if (totalMatch) {
-      const oldTotal = parseInt(totalMatch[2], 10);
-      stateContent = stateContent.replace(totalPattern, `$1${oldTotal - 1}`);
+
+    // Update "Total Phases" field, in § Current Position and outside comments.
+    const currentTotal = stateExtractField(stateContent, 'Total Phases');
+    const parsedTotal = parseInt(currentTotal, 10);
+    if (!isNaN(parsedTotal)) {
+      const next = stateReplaceField(stateContent, 'Total Phases', String(parsedTotal - 1));
+      if (next !== null) stateContent = next;
     }
-    // Update "Phase: X of Y" pattern
+
+    // Update "Phase: X of Y". This pattern is loose enough to match the first
+    // "of 33 phases" anywhere in the document — including inside a comment log
+    // or a prose paragraph — so it is confined to § Current Position.
     const ofPattern = /(\bof\s+)(\d+)(\s*(?:\(|phases?))/i;
-    const ofMatch = stateContent.match(ofPattern);
-    if (ofMatch) {
-      const oldTotal = parseInt(ofMatch[2], 10);
-      stateContent = stateContent.replace(ofPattern, `$1${oldTotal - 1}$3`);
-    }
+    stateContent = replaceInCurrentPosition(stateContent, ofPattern, (match, prefix, total, suffix) => {
+      const parsed = parseInt(total, 10);
+      return isNaN(parsed) ? match : `${prefix}${parsed - 1}${suffix}`;
+    });
+
     writeStateMd(statePath, stateContent, cwd);
   }
 
@@ -726,14 +729,17 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
     // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
+    // Padding-insensitive throughout: the checklist may say `7.5` where the
+    // heading says `07.5`, and matching on the caller's spelling means ticking
+    // nothing while reporting success.
     const checkboxPattern = new RegExp(
-      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegex(phaseNum)}[:\\s][^\\n]*)`,
+      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseNumPattern(phaseNum)}[:\\s][^\\n]*)`,
       'i'
     );
     roadmapContent = replaceInCurrentMilestone(roadmapContent, checkboxPattern, `$1x$2 (completed ${today})`);
 
     // Progress table: update Status to Complete, add date
-    const phaseEscaped = escapeRegex(phaseNum);
+    const phaseEscaped = phaseNumPattern(phaseNum);
     const tablePattern = new RegExp(
       `(\\|\\s*${phaseEscaped}\\.?\\s[^|]*\\|[^|]*\\|)\\s*[^|]*(\\|)\\s*[^|]*(\\|)`,
       'i'
@@ -759,7 +765,7 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
     const reqPath = path.join(cwd, '.planning', 'REQUIREMENTS.md');
     if (fs.existsSync(reqPath)) {
       // Extract the current phase section from roadmap (scoped to avoid cross-phase matching)
-      const phaseEsc = escapeRegex(phaseNum);
+      const phaseEsc = phaseNumPattern(phaseNum);
       const currentMilestoneRoadmap = stripShippedMilestones(roadmapContent);
       const phaseSectionMatch = currentMilestoneRoadmap.match(
         new RegExp(`(#{2,4}\\s*Phase\\s+${phaseEsc}[:\\s][\\s\\S]*?)(?=#{2,4}\\s*Phase\\s+|$)`, 'i')
@@ -842,42 +848,28 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   if (fs.existsSync(statePath)) {
     let stateContent = fs.readFileSync(statePath, 'utf-8');
 
-    // Update Current Phase
-    stateContent = stateContent.replace(
-      /(\*\*Current Phase:\*\*\s*).*/,
-      `$1${nextPhaseNum || phaseNum}`
-    );
+    // Every one of these went through a bare, non-global `content.replace()`
+    // against the whole document. STATE.md carries hand-written HTML-comment
+    // logs that quote these exact field lines as evidence, and those comments
+    // sit ABOVE § Current Position — so the first match was the quoted copy.
+    // The result was doubly wrong: the historical record was rewritten (and its
+    // line truncated by the trailing `.*`), and the live field was left stale.
+    //
+    // stateReplaceField writes inside § Current Position and never inside a
+    // comment. It returns null when the field is absent, so keep the original.
+    const setField = (field, value) => {
+      const next = stateReplaceField(stateContent, field, value);
+      if (next !== null) stateContent = next;
+    };
 
-    // Update Current Phase Name
-    if (nextPhaseName) {
-      stateContent = stateContent.replace(
-        /(\*\*Current Phase Name:\*\*\s*).*/,
-        `$1${nextPhaseName.replace(/-/g, ' ')}`
-      );
-    }
-
-    // Update Status
-    stateContent = stateContent.replace(
-      /(\*\*Status:\*\*\s*).*/,
-      `$1${isLastPhase ? 'Milestone complete' : 'Ready to plan'}`
-    );
-
-    // Update Current Plan
-    stateContent = stateContent.replace(
-      /(\*\*Current Plan:\*\*\s*).*/,
-      `$1Not started`
-    );
-
-    // Update Last Activity
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity:\*\*\s*).*/,
-      `$1${today}`
-    );
-
-    // Update Last Activity Description
-    stateContent = stateContent.replace(
-      /(\*\*Last Activity Description:\*\*\s*).*/,
-      `$1Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
+    setField('Current Phase', nextPhaseNum || phaseNum);
+    if (nextPhaseName) setField('Current Phase Name', nextPhaseName.replace(/-/g, ' '));
+    setField('Status', isLastPhase ? 'Milestone complete' : 'Ready to plan');
+    setField('Current Plan', 'Not started');
+    setField('Last Activity', today);
+    setField(
+      'Last Activity Description',
+      `Phase ${phaseNum} complete${nextPhaseNum ? `, transitioned to Phase ${nextPhaseNum}` : ''}`
     );
 
     writeStateMd(statePath, stateContent, cwd);

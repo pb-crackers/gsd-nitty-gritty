@@ -45,6 +45,9 @@
  * Requirements Operations:
  *   requirements mark-complete <ids>   Mark requirement IDs as complete in REQUIREMENTS.md
  *                                      Accepts: REQ-01,REQ-02 or REQ-01 REQ-02 or [REQ-01, REQ-02]
+ *     [--evidence "..."]               Record why each id was closed, in the same edit as the tick.
+ *                                      Pass ONLY the ids this plan actually closed — a plan's
+ *                                      frontmatter lists ids it may deliberately hold open.
  *
  * Milestone Operations:
  *   milestone complete <version>       Archive milestone, create MILESTONES.md
@@ -426,7 +429,11 @@ async function main() {
     case 'requirements': {
       const subcommand = args[1];
       if (subcommand === 'mark-complete') {
-        milestone.cmdRequirementsMarkComplete(cwd, args.slice(2), raw);
+        const rest = args.slice(2);
+        const evidenceIdx = rest.indexOf('--evidence');
+        const evidence = evidenceIdx !== -1 ? rest[evidenceIdx + 1] : undefined;
+        const ids = evidenceIdx !== -1 ? rest.slice(0, evidenceIdx).concat(rest.slice(evidenceIdx + 2)) : rest;
+        milestone.cmdRequirementsMarkComplete(cwd, ids, { evidence }, raw);
       } else {
         error('Unknown requirements subcommand. Available: mark-complete');
       }

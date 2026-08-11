@@ -8,10 +8,12 @@ const { escapeRegex, getMilestonePhaseFilter, output, error } = require('./core.
 const { extractFrontmatter } = require('./frontmatter.cjs');
 const { writeStateMd } = require('./state.cjs');
 
-function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
+function cmdRequirementsMarkComplete(cwd, reqIdsRaw, options, raw) {
   if (!reqIdsRaw || reqIdsRaw.length === 0) {
     error('requirement IDs required. Usage: requirements mark-complete REQ-01,REQ-02 or REQ-01 REQ-02');
   }
+
+  const evidence = (options && options.evidence) ? String(options.evidence).trim() : '';
 
   // Accept comma-separated, space-separated, or bracket-wrapped: [REQ-01, REQ-02]
   const reqIds = reqIdsRaw
@@ -34,6 +36,8 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
   let reqContent = fs.readFileSync(reqPath, 'utf-8');
   const updated = [];
   const notFound = [];
+  const evidenceWritten = [];
+  const alreadyComplete = [];
 
   for (const reqId of reqIds) {
     let found = false;
@@ -57,8 +61,25 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
       found = true;
     }
 
+    // A requirement closed on a human's verdict needs the verdict recorded with
+    // the tick, in the same edit — a checkbox and a Traceability row with no
+    // evidence loses why it was closed, which is what forced this by hand.
+    if (found && evidence) {
+      const linePattern = new RegExp(`^([ \\t]*)-[ \\t]*\\[x\\][ \\t]*\\*\\*${reqEscaped}\\*\\*[^\\n]*$`, 'im');
+      const lineMatch = reqContent.match(linePattern);
+      const evidenceLine = `${lineMatch ? lineMatch[1] : ''}  - Evidence: ${evidence}`;
+      if (lineMatch && !reqContent.includes(evidenceLine)) {
+        reqContent = reqContent.replace(linePattern, `${lineMatch[0]}\n${evidenceLine}`);
+        evidenceWritten.push(reqId);
+      }
+    }
+
     if (found) {
       updated.push(reqId);
+    } else if (new RegExp(`\\*\\*${reqEscaped}\\*\\*|\\|\\s*${reqEscaped}\\s*\\|`, 'i').test(reqContent)) {
+      // The id exists and is already closed. Reporting that as "not found" told
+      // callers the requirement was missing when it was simply already done.
+      alreadyComplete.push(reqId);
     } else {
       notFound.push(reqId);
     }
@@ -68,12 +89,20 @@ function cmdRequirementsMarkComplete(cwd, reqIdsRaw, raw) {
     fs.writeFileSync(reqPath, reqContent, 'utf-8');
   }
 
-  output({
+  const result = {
     updated: updated.length > 0,
     marked_complete: updated,
     not_found: notFound,
     total: reqIds.length,
-  }, raw, `${updated.length}/${reqIds.length} requirements marked complete`);
+    evidence_recorded: evidenceWritten.length > 0,
+  };
+  if (alreadyComplete.length > 0) result.already_complete = alreadyComplete;
+  if (evidenceWritten.length > 0) result.evidence_for = evidenceWritten;
+  if (updated.length > 0 && !evidence) {
+    result.warning = 'Requirements were closed with no evidence. Pass --evidence "..." to record why, in the same edit as the tick.';
+  }
+
+  output(result, raw, `${updated.length}/${reqIds.length} requirements marked complete`);
 }
 
 function cmdMilestoneComplete(cwd, version, options, raw) {

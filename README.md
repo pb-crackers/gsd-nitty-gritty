@@ -174,6 +174,29 @@ GSD Nitty Gritty trades raw generation speed for engineering rigor. Every phase 
 
 ---
 
+## 🧪 Tests
+
+`bin/gsd-tools.cjs` mutates `.planning/` documents that nobody reads line by line, so a
+silent no-op or a bad regex can corrupt state for weeks before anyone notices. The suite in
+`test/` exists to make those failures loud.
+
+```bash
+npm test              # or: node test/run.cjs
+node test/run.cjs roadmap    # run tests whose name contains "roadmap"
+```
+
+No framework and no dependencies — plain Node assertions. Each test builds a throwaway
+project in a temp directory and runs the real CLI against it, because every command ends in
+`process.exit()`.
+
+Fixtures deliberately use the shapes found in the wild rather than the shapes the templates
+emit: phase numbers spelled both `7.5` and `07.5`, a `**Status:**` line written as prose, a
+`**Total Plans in Phase:** 3/9`, and an HTML-comment log that quotes live field values
+verbatim. If you touch anything that writes STATE.md or ROADMAP.md, add the malformed input
+that broke it.
+
+---
+
 ## 🙏 Credits
 
 Built on top of [Get Shit Done (GSD)](https://github.com/gsd-build/get-shit-done) by the GSD team.

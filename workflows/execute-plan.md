@@ -446,16 +446,24 @@ If SUMMARY "Issues Encountered" ≠ "None": yolo → log and continue. Interacti
 node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" roadmap update-plan-progress "${PHASE}"
 ```
 Counts PLAN vs SUMMARY files on disk. Updates progress table row with correct count and status (`In Progress` or `Complete` with date).
+
+Check `updated` in the response — it is `false` when nothing in ROADMAP.md changed, and `reason` says which case it was:
+- `already up to date` — the row already held these values. Nothing to do.
+- `No matching ROADMAP.md content` — there is no row, checkbox or `**Plans:**` line for this phase in the current milestone. The roadmap needs the phase added; tick it by hand for now and say so in the SUMMARY.
 </step>
 
 <step name="update_requirements">
-Mark completed requirements from the PLAN.md frontmatter `requirements:` field:
+Mark the requirements this plan actually closed:
 
 ```bash
-node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" requirements mark-complete ${REQ_IDS}
+node "/Users/phillipdougherty/.claude/get-shit-done/bin/gsd-tools.cjs" requirements mark-complete ${REQ_IDS} --evidence "${WHAT_PROVED_IT}"
 ```
 
-Extract requirement IDs from the plan's frontmatter (e.g., `requirements: [AUTH-01, AUTH-02]`). If no requirements field, skip.
+The plan's frontmatter `requirements:` field lists what the plan **touches**, which is not the same as what it **closes** — a plan routinely holds a requirement open on purpose (waiting on a human verdict, or on a later plan). Pass only the ids this plan closed, not the whole frontmatter list. If none closed, skip the command.
+
+`--evidence` is what makes the tick reviewable later: name the thing that proved it (a test, a measurement, a human verdict). Closing without it is allowed but the tool returns a `warning`, because a requirement closed on someone's judgement loses that judgement otherwise.
+
+Check the response: `not_found` means the id is not in REQUIREMENTS.md (likely a typo); `already_complete` means it was closed earlier and is not an error.
 </step>
 
 <step name="git_commit_metadata">
