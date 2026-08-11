@@ -143,22 +143,33 @@ This is a drop-in enhancement to the standard GSD workflow. The same commands wo
 
 ## 📦 Installation
 
-Replace the standard GSD workflows directory with this repo:
+This repo is the whole system — workflows, commands, agents and tooling. It does not track
+upstream GSD and there is no npm package.
 
 ```bash
-# Back up your current workflows (if you want to keep them)
-cp -r ~/.claude/get-shit-done ~/.claude/get-shit-done-backup
-
-# Clone this repo
 git clone https://github.com/pb-crackers/gsd-nitty-gritty.git ~/.claude/get-shit-done
+node ~/.claude/get-shit-done/bin/install.cjs --copy
 ```
 
-Or if you already have GSD installed and just want to swap the workflows:
+The installer puts the 38 commands and 15 agents where Claude Code looks for them. Everything
+else stays in the repo and is referenced by path, so `workflows/`, `references/` and
+`templates/` are never copied around.
+
+Anything it replaces is moved to `~/.claude/gsd-backup-N/` first. Nothing is deleted.
+
+**Two modes.** `--copy` takes a snapshot, which is what you want if you are using this as-is:
+re-run it after pulling. Omit the flag to symlink instead, so edits in the repo are live the
+moment you save them — the right choice if you intend to modify the workflows, which is the
+point of a fork.
 
 ```bash
-git clone https://github.com/pb-crackers/gsd-nitty-gritty.git /tmp/gsd-nitty-gritty
-cp -r /tmp/gsd-nitty-gritty/workflows ~/.claude/get-shit-done/workflows
+node bin/install.cjs --dry-run          # show what would happen
+node bin/install.cjs --runtime ~/.config/opencode
 ```
+
+**Updating.** `/gsd:update` pulls this repo and reinstalls; the commit log is the changelog.
+If your copy is ahead of the remote it will tell you that you are the source of truth rather
+than trying to update you.
 
 ---
 
